@@ -56,6 +56,7 @@ jobs:
             ".github/workflows/build-artifacts.yml"
             ".github/workflows/codeql-fork.yml"
             ".github/workflows/supply-chain-audit.yml"
+            ".github/workflows/definitions-update-fork.yml"
             ".github/dependabot.yml"
           )
 
@@ -178,8 +179,9 @@ jobs:
         shell: bash
         run: |
           {
-            echo "## Jackett upstream sync"
-            echo "- upstream head: ${UPSTREAM_SHA:-unknown}"
-            echo "- fork changed: ${CHANGED:-unknown}"
-            echo "- fork head: ${HEAD_SHA:-unknown}"
+            echo "## Upstream sync"
+            echo
+            echo "- Upstream: \`${UPSTREAM_SHA:-unknown}\`"
+            echo "- Changed: \`${CHANGED:-unknown}\`"
+            echo "- Fork head: \`${HEAD_SHA:-unknown}\`"
           } >> "$GITHUB_STEP_SUMMARY"
