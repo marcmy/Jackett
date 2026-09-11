@@ -177,8 +177,8 @@ namespace Jackett.Common.Utils.Clients
                 var postData = "";
                 if (request.Type == RequestType.POST)
                 {
-                    var lines = request.PostData?.Select(kvp => kvp.Key + "=" + kvp.Value).ToList() ?? new List<string>();
-                    postData = $" PostData: {{{string.Join(", ", lines)}}} RawBody: {request.RawBody}";
+                    var postDataKeys = request.PostData?.Select(kvp => kvp.Key).ToList() ?? new List<string>();
+                    postData = $" PostDataKeys: {{{string.Join(", ", postDataKeys)}}}";
                 }
                 logger.Debug($"WebClient({ClientType}).GetResultAsync(Method: {request.Type} Url: {request.Url}{postData})");
             }
