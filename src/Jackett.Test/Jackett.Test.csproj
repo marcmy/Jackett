@@ -19,20 +19,20 @@
   </ItemGroup>
 
   <ItemGroup>
-    <PackageReference Include="Autofac" Version="8.0.0" />
-    <PackageReference Include="coverlet.msbuild" Version="6.0.4">
+    <PackageReference Include="Autofac" Version="9.3.2" />
+    <PackageReference Include="coverlet.msbuild" Version="10.0.1">
       <PrivateAssets>all</PrivateAssets>
       <IncludeAssets>runtime; build; native; contentfiles; analyzers; buildtransitive</IncludeAssets>
     </PackageReference>
-    <PackageReference Include="FluentAssertions" Version="7.2.2" />
-    <PackageReference Include="Microsoft.AspNetCore.DataProtection" Version="9.0.19" />
-    <PackageReference Include="Microsoft.NET.Test.Sdk" Version="17.14.1" />
-    <PackageReference Include="MSTest.TestAdapter" Version="3.10.4" />
-    <PackageReference Include="MSTest.TestFramework" Version="3.10.4" />
-    <PackageReference Include="NUnit" Version="3.14.0" />
-    <PackageReference Include="NUnit.ConsoleRunner" Version="3.17.0" />
-    <PackageReference Include="NUnit3TestAdapter" Version="4.5.0" />
-    <PackageReference Include="System.Text.Encoding.CodePages" Version="9.0.19" />
+    <PackageReference Include="FluentAssertions" Version="8.10.0" />
+    <PackageReference Include="Microsoft.AspNetCore.DataProtection" Version="10.0.12" />
+    <PackageReference Include="Microsoft.NET.Test.Sdk" Version="18.10.0" />
+    <PackageReference Include="MSTest.TestAdapter" Version="4.4.0" />
+    <PackageReference Include="MSTest.TestFramework" Version="4.4.0" />
+    <PackageReference Include="NUnit" Version="4.6.1" />
+    <PackageReference Include="NUnit.ConsoleRunner" Version="3.22.0" />
+    <PackageReference Include="NUnit3TestAdapter" Version="6.3.0" />
+    <PackageReference Include="System.Text.Encoding.CodePages" Version="10.0.12" />
   </ItemGroup>
 
   <ItemGroup>
