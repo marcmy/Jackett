@@ -1,0 +1,185 @@
+name: Sync upstream
+
+on:
+  workflow_dispatch:
+  schedule:
+    # Daily at 09:17 UTC.
+    - cron: "17 9 * * *"
+
+permissions: {}
+
+concurrency:
+  group: sync-upstream
+  cancel-in-progress: false
+
+jobs:
+  sync:
+    name: Merge Jackett upstream master
+    runs-on: ubuntu-24.04
+    timeout-minutes: 15
+
+    permissions:
+      actions: write
+      contents: write
+
+    steps:
+      - name: Check out fork master
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          ref: master
+          fetch-depth: 0
+          token: ${{ github.token }}
+          persist-credentials: true
+
+      - name: Fetch upstream master
+        shell: bash
+        run: |
+          set -euo pipefail
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git remote add upstream https://github.com/Jackett/Jackett.git
+          git fetch --prune --no-tags upstream master
+
+      - name: Merge upstream conservatively
+        id: sync
+        shell: bash
+        run: |
+          set -euo pipefail
+
+          upstream_sha="$(git rev-parse upstream/master)"
+          original_head="$(git rev-parse HEAD)"
+
+          # Only fork-maintenance files belong here. Upstream-owned files such as
+          # codeql-analysis.yml intentionally remain free to follow upstream.
+          fork_owned=(
+            ".github/workflows/sync-upstream.yml"
+            ".github/workflows/build-artifacts.yml"
+            ".github/workflows/codeql-fork.yml"
+            ".github/workflows/supply-chain-audit.yml"
+            ".github/dependabot.yml"
+          )
+
+          restore_fork_owned_files() {
+            local path
+            for path in "${fork_owned[@]}"; do
+              if git cat-file -e "${original_head}:${path}" 2>/dev/null; then
+                git checkout "$original_head" -- "$path"
+              fi
+            done
+          }
+
+          normalize_stage() {
+            local stage="$1"
+            local path="$2"
+            git show ":${stage}:${path}" | python3 -c 'import sys; raw=sys.stdin.buffer.read().replace(b"\r\n", b"\n").replace(b"\r", b"\n"); out=b"\n".join(line.rstrip(b" \t") for line in raw.split(b"\n")).rstrip(b"\n"); sys.stdout.buffer.write(out + (b"\n" if out else b""))'
+          }
+
+          resolve_equivalent_conflicts() {
+            local path ours_hash theirs_hash
+            while IFS= read -r path; do
+              [[ -z "$path" ]] && continue
+
+              if git cat-file -e ":2:${path}" 2>/dev/null && git cat-file -e ":3:${path}" 2>/dev/null; then
+                ours_hash="$(normalize_stage 2 "$path" | sha256sum | cut -d' ' -f1)"
+                theirs_hash="$(normalize_stage 3 "$path" | sha256sum | cut -d' ' -f1)"
+                if [[ "$ours_hash" == "$theirs_hash" ]]; then
+                  echo "Auto-resolving content-equivalent conflict: $path"
+                  git checkout --ours -- "$path"
+                  git add -- "$path"
+                fi
+              fi
+            done < <(git diff --name-only --diff-filter=U)
+          }
+
+          if git merge-base --is-ancestor upstream/master HEAD; then
+            echo "Fork already contains current upstream master."
+            echo "changed=false" >> "$GITHUB_OUTPUT"
+            echo "upstream_sha=$upstream_sha" >> "$GITHUB_OUTPUT"
+            echo "head_sha=$original_head" >> "$GITHUB_OUTPUT"
+            exit 0
+          fi
+
+          merge_status=0
+          git -c merge.renormalize=true merge --no-commit --no-ff upstream/master || merge_status=$?
+
+          # Never let an upstream merge replace the fork's maintenance layer.
+          restore_fork_owned_files
+
+          # Auto-resolve only differences that are semantically identical after
+          # normalizing line endings and trailing whitespace. Real conflicts fail.
+          resolve_equivalent_conflicts
+
+          unresolved="$(git diff --name-only --diff-filter=U)"
+          if [[ -n "$unresolved" ]]; then
+            {
+              echo "## Upstream sync blocked by real conflicts"
+              echo
+              echo '```text'
+              printf '%s\n' "$unresolved"
+              echo '```'
+              echo
+              echo "No source conflict was guessed or overwritten."
+            } >> "$GITHUB_STEP_SUMMARY"
+
+            echo "::error::Unresolved upstream merge conflicts remain:"
+            printf '%s\n' "$unresolved"
+            git merge --abort || true
+            exit 1
+          fi
+
+          if [[ "$merge_status" -ne 0 ]] && ! git rev-parse -q --verify MERGE_HEAD >/dev/null; then
+            echo "::error::git merge failed without leaving a resolvable merge state."
+            exit "$merge_status"
+          fi
+
+          for path in "${fork_owned[@]}"; do
+            if git cat-file -e "${original_head}:${path}" 2>/dev/null; then
+              if ! git diff --quiet "$original_head" -- "$path"; then
+                echo "::error::Fork-owned file changed during upstream merge: $path"
+                git diff "$original_head" -- "$path"
+                git merge --abort || true
+                exit 1
+              fi
+            fi
+          done
+
+          git commit -m "Merge upstream Jackett master"
+          git push origin HEAD:refs/heads/master
+
+          head_sha="$(git rev-parse HEAD)"
+          echo "changed=true" >> "$GITHUB_OUTPUT"
+          echo "upstream_sha=$upstream_sha" >> "$GITHUB_OUTPUT"
+          echo "head_sha=$head_sha" >> "$GITHUB_OUTPUT"
+
+      - name: Start artifact build
+        if: github.event_name == 'workflow_dispatch' || steps.sync.outputs.changed == 'true'
+        uses: actions/github-script@3a2844b7e9c422d3c10d287c895573f7108da1b3 # v9
+        env:
+          SOURCE_REF: ${{ steps.sync.outputs.head_sha }}
+        with:
+          github-token: ${{ github.token }}
+          script: |
+            await github.rest.actions.createWorkflowDispatch({
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              workflow_id: 'build-artifacts.yml',
+              ref: 'master',
+              inputs: {
+                source_ref: process.env.SOURCE_REF
+              }
+            });
+
+      - name: Summarize sync
+        if: always()
+        env:
+          UPSTREAM_SHA: ${{ steps.sync.outputs.upstream_sha }}
+          CHANGED: ${{ steps.sync.outputs.changed }}
+          HEAD_SHA: ${{ steps.sync.outputs.head_sha }}
+        shell: bash
+        run: |
+          {
+            echo "## Jackett upstream sync"
+            echo "- upstream head: ${UPSTREAM_SHA:-unknown}"
+            echo "- fork changed: ${CHANGED:-unknown}"
+            echo "- fork head: ${HEAD_SHA:-unknown}"
+          } >> "$GITHUB_STEP_SUMMARY"
