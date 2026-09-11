@@ -1,0 +1,61 @@
+name: Update definitions (fork)
+
+on:
+  workflow_dispatch:
+  schedule:
+    - cron: '0 1 * * *'
+
+permissions: {}
+
+concurrency:
+  group: definitions-update-fork
+  cancel-in-progress: false
+
+jobs:
+  update-rudub:
+    name: Update rudub
+    runs-on: ubuntu-24.04
+    timeout-minutes: 10
+
+    permissions:
+      contents: write
+
+    steps:
+      - name: Check out fork master
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          ref: master
+          fetch-depth: 1
+          persist-credentials: true
+
+      - name: Set definition domains
+        shell: bash
+        run: |
+          set -euo pipefail
+          echo "CURRENT_RUDUB_DOMAIN=$(date +'%b%d' | tr '[:upper:]' '[:lower:]').rudub.bet" >> "$GITHUB_ENV"
+          echo "PREVIOUS_RUDUB_DOMAIN=$(date --date='yesterday' +'%b%d' | tr '[:upper:]' '[:lower:]').rudub.bet" >> "$GITHUB_ENV"
+
+      - name: Update rudub definition
+        uses: mikefarah/yq@c14f446382944492701b16c1ddb48bb9dbe683e3 # v4.53.6
+        with:
+          cmd: yq -i '.legacylinks += "https://" + strenv(PREVIOUS_RUDUB_DOMAIN) + "/" | .legacylinks += "http://" + strenv(CURRENT_RUDUB_DOMAIN) + "/" | .links = ["https://" + strenv(CURRENT_RUDUB_DOMAIN) + "/"] | .legacylinks |= unique | .legacylinks = .legacylinks.[-30:]' src/Jackett.Common/Definitions/rudub.yml
+
+      - name: Show changes
+        shell: bash
+        run: git diff --color
+
+      - name: Commit definition update
+        shell: bash
+        run: |
+          set -euo pipefail
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add src/Jackett.Common/Definitions/rudub.yml
+
+          if git diff --cached --quiet; then
+            echo "No definition changes since last run."
+            exit 0
+          fi
+
+          git commit -m "Update rudub"
+          git push origin HEAD:refs/heads/master
