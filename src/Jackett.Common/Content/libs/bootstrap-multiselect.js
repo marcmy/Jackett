@@ -950,12 +950,8 @@
       var classes = this.options.optionClass(group);
       $li.addClass(classes);
 
-      if (this.options.enableHTML) {
-        $('label b', $li).html(" " + label);
-      }
-      else {
-        $('label b', $li).text(" " + label);
-      }
+      // Optgroup labels come from DOM attributes and must remain text.
+      $('label b', $li).text(" " + label);
 
       if (this.options.enableCollapsibleOptGroups && this.options.multiple) {
         $('a', $li).append('<span class="caret-container"><b class="caret"></b></span>');
