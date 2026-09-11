@@ -28,16 +28,18 @@ jobs:
 
           path = Path("src/Jackett.Common/Content/libs/bootstrap-multiselect.js")
           text = path.read_text(encoding="utf-8")
-          old = '''      if (this.options.enableHTML) {
-            $('label b', $li).html(" " + label);
-          }
-          else {
-            $('label b', $li).text(" " + label);
-          }
-'''
-          new = '''      // Optgroup labels come from DOM attributes and must remain text.
-          $('label b', $li).text(" " + label);
-'''
+          old = (
+              "      if (this.options.enableHTML) {\n"
+              "        $('label b', $li).html(\" \" + label);\n"
+              "      }\n"
+              "      else {\n"
+              "        $('label b', $li).text(\" \" + label);\n"
+              "      }\n"
+          )
+          new = (
+              "      // Optgroup labels come from DOM attributes and must remain text.\n"
+              "      $('label b', $li).text(\" \" + label);\n"
+          )
 
           count = text.count(old)
           if count != 1:
