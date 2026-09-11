@@ -1,0 +1,202 @@
+name: Build custom artifacts
+
+on:
+  push:
+    branches:
+      - master
+    paths:
+      - "src/**"
+      - "Installer.iss"
+      - "jackett_launcher.bat"
+      - ".github/workflows/build-artifacts.yml"
+  workflow_dispatch:
+    inputs:
+      source_ref:
+        description: Jackett branch, tag, or commit to build
+        required: false
+        default: master
+        type: string
+
+permissions: {}
+
+concurrency:
+  group: build-custom-${{ inputs.source_ref || github.ref }}
+  cancel-in-progress: true
+
+env:
+  DOTNET_NOLOGO: true
+  DOTNET_CLI_TELEMETRY_OPTOUT: true
+  BUILD_CONFIGURATION: Release
+  TARGET_FRAMEWORK: net9.0
+  RUNTIME_IDENTIFIER: win-x86
+
+jobs:
+  build-windows:
+    name: Windows x86
+    runs-on: windows-2025
+    timeout-minutes: 45
+
+    outputs:
+      source_sha: ${{ steps.revision.outputs.sha }}
+      source_short_sha: ${{ steps.revision.outputs.short_sha }}
+
+    steps:
+      - name: Check out source
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          ref: ${{ inputs.source_ref || github.sha }}
+          persist-credentials: false
+
+      - name: Record source revision
+        id: revision
+        shell: pwsh
+        run: |
+          $sha = git rev-parse HEAD
+          $shortSha = git rev-parse --short=12 HEAD
+          "sha=$sha" | Out-File -FilePath $env:GITHUB_OUTPUT -Encoding utf8 -Append
+          "short_sha=$shortSha" | Out-File -FilePath $env:GITHUB_OUTPUT -Encoding utf8 -Append
+
+      - name: Set up .NET 9
+        uses: actions/setup-dotnet@a98b56852c35b8e3190ac28c8c2271da59106c68 # v6
+        with:
+          dotnet-version: 9.0.x
+
+      - name: Build Windows package
+        shell: pwsh
+        run: |
+          $ErrorActionPreference = 'Stop'
+
+          $version = "0.24.$env:GITHUB_RUN_NUMBER"
+          $buildRoot = Join-Path $env:RUNNER_TEMP 'jackett-build'
+          $packageRoot = Join-Path $env:RUNNER_TEMP 'jackett-package'
+          $packageDir = Join-Path $packageRoot 'Jackett'
+          $serverDir = Join-Path $buildRoot 'Jackett.Server'
+          $updaterDir = Join-Path $buildRoot 'Jackett.Updater'
+          $trayDir = Join-Path $buildRoot 'Jackett.Tray'
+          $serviceDir = Join-Path $buildRoot 'Jackett.Service'
+
+          Remove-Item $buildRoot, $packageRoot -Recurse -Force -ErrorAction SilentlyContinue
+          New-Item $serverDir, $updaterDir, $trayDir, $serviceDir, $packageDir -ItemType Directory -Force | Out-Null
+
+          dotnet build src/DateTimeRoutines/DateTimeRoutines.csproj `
+            --configuration $env:BUILD_CONFIGURATION `
+            --runtime $env:RUNTIME_IDENTIFIER `
+            --framework netstandard2.0
+          if ($LASTEXITCODE -ne 0) { throw 'DateTimeRoutines build failed' }
+
+          function Publish-JackettProject {
+            param(
+              [Parameter(Mandatory)] [string] $Project,
+              [Parameter(Mandatory)] [string] $Framework,
+              [Parameter(Mandatory)] [string] $Output
+            )
+
+            dotnet publish $Project `
+              --configuration $env:BUILD_CONFIGURATION `
+              --runtime $env:RUNTIME_IDENTIFIER `
+              --framework $Framework `
+              --self-contained true `
+              --output $Output `
+              /p:AssemblyVersion=$version `
+              /p:FileVersion=$version `
+              /p:InformationalVersion=$version `
+              /p:Version=$version
+
+            if ($LASTEXITCODE -ne 0) { throw "Publish failed: $Project" }
+          }
+
+          Publish-JackettProject 'src/Jackett.Server/Jackett.Server.csproj' $env:TARGET_FRAMEWORK $serverDir
+          Publish-JackettProject 'src/Jackett.Updater/Jackett.Updater.csproj' $env:TARGET_FRAMEWORK $updaterDir
+          Publish-JackettProject 'src/Jackett.Tray/Jackett.Tray.csproj' "$($env:TARGET_FRAMEWORK)-windows" $trayDir
+          Publish-JackettProject 'src/Jackett.Service/Jackett.Service.csproj' "$($env:TARGET_FRAMEWORK)-windows" $serviceDir
+
+          Copy-Item (Join-Path $serverDir '*') $packageDir -Recurse -Force
+
+          Get-ChildItem $updaterDir -File -Filter 'JackettUpdater*' | ForEach-Object {
+            Copy-Item $_.FullName $packageDir -Force
+          }
+
+          foreach ($name in @(
+            'System.Drawing.dll',
+            'System.Security.Cryptography.ProtectedData.dll',
+            'WindowsBase.dll'
+          )) {
+            $source = Join-Path $trayDir $name
+            if (Test-Path $source) {
+              Copy-Item $source $packageDir -Force
+            }
+          }
+
+          Get-ChildItem $trayDir -Recurse -File | ForEach-Object {
+            $relative = $_.FullName.Substring($trayDir.Length).TrimStart('\')
+            $target = Join-Path $packageDir $relative
+            if (-not (Test-Path $target)) {
+              New-Item (Split-Path $target) -ItemType Directory -Force | Out-Null
+              Copy-Item $_.FullName $target
+            }
+          }
+
+          Get-ChildItem $serviceDir -File -Filter 'JackettService*' | ForEach-Object {
+            Copy-Item $_.FullName $packageDir -Force
+          }
+
+          Copy-Item 'jackett_launcher.bat' $packageDir -Force
+          Copy-Item 'LICENSE' $packageDir -Force
+
+          @(
+            "repository: $env:GITHUB_SERVER_URL/$env:GITHUB_REPOSITORY"
+            "commit: ${{ steps.revision.outputs.sha }}"
+            "requested ref: ${{ inputs.source_ref || github.ref }}"
+            "runtime: $env:RUNTIME_IDENTIFIER"
+            "framework: $env:TARGET_FRAMEWORK"
+            "version: $version"
+          ) | Set-Content (Join-Path $packageDir 'BUILD-INFO.txt') -Encoding utf8
+
+          foreach ($required in @('JackettConsole.exe', 'JackettUpdater.exe', 'JackettTray.exe', 'JackettService.exe')) {
+            if (-not (Test-Path (Join-Path $packageDir $required))) {
+              throw "Expected build output was not found: $required"
+            }
+          }
+
+      - name: Upload Windows artifact
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
+        with:
+          name: Jackett-Custom_Windows-x86-${{ steps.revision.outputs.short_sha }}
+          path: ${{ runner.temp }}/jackett-package
+          if-no-files-found: error
+          retention-days: 30
+          compression-level: 9
+
+  update-scoop:
+    name: Trigger scoop-bucket Excavator
+    needs: build-windows
+    if: >-
+      github.ref == 'refs/heads/master' &&
+      (github.event_name == 'push' || github.event_name == 'workflow_dispatch')
+    runs-on: ubuntu-24.04
+    timeout-minutes: 10
+    environment: scoop-bucket
+
+    permissions:
+      contents: read
+
+    steps:
+      - name: Dispatch jackett-custom update
+        if: env.SCOOP_BUCKET_TOKEN != ''
+        uses: peter-evans/repository-dispatch@28959ce8df70de7be546dd1250a005dd32156697 # v4.0.1
+        env:
+          SCOOP_BUCKET_TOKEN: ${{ secrets.SCOOP_BUCKET_TOKEN }}
+        with:
+          token: ${{ secrets.SCOOP_BUCKET_TOKEN }}
+          repository: marcmy/scoop-bucket
+          event-type: jackett-custom-built
+          client-payload: >-
+            {"run_id":"${{ github.run_id }}","head_sha":"${{ needs.build-windows.outputs.source_sha }}"}
+
+      - name: Note missing dispatch token
+        if: env.SCOOP_BUCKET_TOKEN == ''
+        env:
+          SCOOP_BUCKET_TOKEN: ${{ secrets.SCOOP_BUCKET_TOKEN }}
+        shell: bash
+        run: |
+          echo "SCOOP_BUCKET_TOKEN is not configured; the bucket's hourly Excavator schedule will still discover the artifact." >> "$GITHUB_STEP_SUMMARY"
