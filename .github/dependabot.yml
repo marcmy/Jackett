@@ -10,9 +10,17 @@ updates:
       timezone: "America/New_York"
     open-pull-requests-limit: 5
     groups:
-      nuget-dependencies:
+      routine-nuget:
+        applies-to: version-updates
         patterns:
           - "*"
+        update-types:
+          - "minor"
+          - "patch"
+    ignore:
+      - dependency-name: "*"
+        update-types:
+          - "version-update:semver-major"
 
   - package-ecosystem: "github-actions"
     directory: "/"
