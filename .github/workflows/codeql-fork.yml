@@ -1,4 +1,4 @@
-name: CodeQL Advanced (fork)
+name: CodeQL Advanced
 
 on:
   push:
