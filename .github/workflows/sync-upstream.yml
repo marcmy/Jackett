@@ -92,6 +92,97 @@ jobs:
             done < <(git diff --name-only --diff-filter=U)
           }
 
+          resolve_package_version_conflicts() {
+            local path ours theirs
+            while IFS= read -r path; do
+              [[ -z "$path" || "$path" != *.csproj ]] && continue
+              if ! git cat-file -e ":2:${path}" 2>/dev/null || ! git cat-file -e ":3:${path}" 2>/dev/null; then
+                continue
+              fi
+
+              ours="$(mktemp)"
+              theirs="$(mktemp)"
+              git show ":2:${path}" > "$ours"
+              git show ":3:${path}" > "$theirs"
+
+              if python3 - "$ours" "$theirs" "$path" <<'PY'
+          import re
+          import sys
+
+          ours_path, theirs_path, output_path = sys.argv[1:]
+
+          def read_normalized(path):
+              with open(path, "r", encoding="utf-8") as handle:
+                  raw = handle.read().replace("\r\n", "\n").replace("\r", "\n")
+              return "\n".join(line.rstrip(" \t") for line in raw.split("\n")).rstrip("\n") + "\n"
+
+          package_line = re.compile(
+              r'^(?P<indent>[ \t]*)<PackageReference Include="(?P<name>[^"]+)" Version="(?P<version>[^"]+)"(?P<rest>[ \t]*/>)[ \t]*$',
+              re.MULTILINE,
+          )
+
+          ours = read_normalized(ours_path)
+          theirs = read_normalized(theirs_path)
+
+          def mask_versions(text):
+              return package_line.sub(
+                  lambda match: (
+                      f'{match.group("indent")}<PackageReference Include="{match.group("name")}" '
+                      f'Version="<VERSION>"{match.group("rest")}'
+                  ),
+                  text,
+              )
+
+          # Refuse to guess unless the files are otherwise byte-for-byte equivalent
+          # after normalizing whitespace and masking simple PackageReference versions.
+          if mask_versions(ours) != mask_versions(theirs):
+              sys.exit(1)
+
+          ours_refs = list(package_line.finditer(ours))
+          theirs_refs = list(package_line.finditer(theirs))
+          if [m.group("name") for m in ours_refs] != [m.group("name") for m in theirs_refs]:
+              sys.exit(1)
+
+          selected = {}
+          for ours_ref, theirs_ref in zip(ours_refs, theirs_refs):
+              name = ours_ref.group("name")
+              ours_version = ours_ref.group("version")
+              theirs_version = theirs_ref.group("version")
+              if ours_version == theirs_version:
+                  selected[name] = ours_version
+                  continue
+
+              # Only auto-order plain numeric versions. Prereleases, metadata,
+              # ranges, variables, and other NuGet syntax remain manual conflicts.
+              if not re.fullmatch(r"\d+(?:\.\d+)*", ours_version):
+                  sys.exit(1)
+              if not re.fullmatch(r"\d+(?:\.\d+)*", theirs_version):
+                  sys.exit(1)
+
+              def version_key(version):
+                  return tuple(int(part) for part in version.split("."))
+
+              selected[name] = max((ours_version, theirs_version), key=version_key)
+
+          def apply_selected(match):
+              return (
+                  f'{match.group("indent")}<PackageReference Include="{match.group("name")}" '
+                  f'Version="{selected[match.group("name")]}"{match.group("rest")}'
+              )
+
+          resolved = package_line.sub(apply_selected, ours)
+          with open(output_path, "w", encoding="utf-8", newline="\n") as handle:
+              handle.write(resolved)
+          PY
+              then
+                echo "Auto-resolving package-version-only conflict: $path"
+                git add -- "$path"
+              fi
+
+              rm -f "$ours" "$theirs"
+            done < <(git diff --name-only --diff-filter=U)
+          }
+
           if git merge-base --is-ancestor upstream/master HEAD; then
             echo "Fork already contains current upstream master."
             echo "changed=false" >> "$GITHUB_OUTPUT"
@@ -106,9 +197,10 @@ jobs:
           # Never let an upstream merge replace the fork's maintenance layer.
           restore_fork_owned_files
 
-          # Auto-resolve only differences that are semantically identical after
-          # normalizing line endings and trailing whitespace. Real conflicts fail.
+          # Auto-resolve only content-equivalent conflicts or project files whose
+          # sole differences are simple numeric PackageReference versions.
           resolve_equivalent_conflicts
+          resolve_package_version_conflicts
 
           unresolved="$(git diff --name-only --diff-filter=U)"
           if [[ -n "$unresolved" ]]; then
