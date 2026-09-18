@@ -37,6 +37,9 @@ namespace Jackett.Common.Services
         private Variants.JackettVariant variant;
 
         private static readonly Regex _VersionRegex = new Regex(@"v(?<major>\d+)\.(?<minor>\d+)\.(?<build>\d+)", RegexOptions.Compiled);
+        private const string UpdateTempDirectoryName = "JackettUpdate";
+        private const int UpdateTempCleanupRetries = 20;
+        private const int UpdateTempCleanupDelayMilliseconds = 250;
 
         public UpdateService(Logger l, WebClient c, ITrayLockService ls, IServiceConfigService ws, IFilePermissionService fps, ServerConfig sc)
         {
@@ -203,33 +206,61 @@ namespace Jackett.Common.Services
 
         public void CleanupTempDir()
         {
-            var tempDir = Path.GetTempPath();
+            var tempRoot = Path.GetTempPath();
 
-            if (!Directory.Exists(tempDir))
+            if (!Directory.Exists(tempRoot))
             {
-                logger.Error($"Temp dir doesn't exist: {tempDir}");
+                logger.Error($"Temp dir doesn't exist: {tempRoot}");
                 return;
             }
 
+            // The updater now uses one deterministic staging directory. On the first startup
+            // after an update, Jackett can race the updater process exiting, so retry briefly
+            // before giving up. This lets the staging directory clean itself up immediately.
+            DeleteTempDirectory(Path.Combine(tempRoot, UpdateTempDirectoryName), true);
+
+            // Clean up staging directories left by older Jackett versions.
             try
             {
-                var d = new DirectoryInfo(tempDir);
+                var d = new DirectoryInfo(tempRoot);
                 foreach (var dir in d.GetDirectories("JackettUpdate-*"))
                 {
-                    try
-                    {
-                        logger.Info("Deleting JackettUpdate temp files from " + dir.FullName);
-                        dir.Delete(true);
-                    }
-                    catch (Exception e)
-                    {
-                        logger.Error($"Error while deleting temp files from: {dir.FullName}\n{e}");
-                    }
+                    DeleteTempDirectory(dir.FullName, false);
                 }
             }
             catch (Exception e)
             {
-                logger.Error($"Unexpected error while deleting temp files from: {tempDir}\n{e}");
+                logger.Error($"Unexpected error while enumerating legacy temp files from: {tempRoot}\n{e}");
+            }
+        }
+
+        private void DeleteTempDirectory(string directory, bool retryIfBusy)
+        {
+            var attempts = retryIfBusy ? UpdateTempCleanupRetries : 1;
+
+            for (var attempt = 1; attempt <= attempts; attempt++)
+            {
+                try
+                {
+                    if (!Directory.Exists(directory))
+                    {
+                        return;
+                    }
+
+                    logger.Info("Deleting JackettUpdate temp files from " + directory);
+                    Directory.Delete(directory, true);
+                    return;
+                }
+                catch (Exception e) when (retryIfBusy && attempt < attempts &&
+                                          (e is IOException || e is UnauthorizedAccessException))
+                {
+                    Thread.Sleep(UpdateTempCleanupDelayMilliseconds);
+                }
+                catch (Exception e)
+                {
+                    logger.Error($"Error while deleting temp files from: {directory}\n{e}");
+                    return;
+                }
             }
         }
 
@@ -267,7 +298,7 @@ namespace Jackett.Common.Services
                 data = await client.GetResultAsync(new WebRequest() { Url = data.RedirectingTo, EmulateBrowser = true, Type = RequestType.GET });
             }
 
-            var tempDir = Path.Combine(Path.GetTempPath(), "JackettUpdate-" + version + "-" + DateTime.Now.Ticks);
+            var tempDir = Path.Combine(Path.GetTempPath(), UpdateTempDirectoryName);
 
             if (Directory.Exists(tempDir))
             {
@@ -282,6 +313,7 @@ namespace Jackett.Common.Services
                 File.WriteAllBytes(zipPath, data.ContentBytes);
                 var fastZip = new FastZip();
                 fastZip.ExtractZip(zipPath, tempDir, null);
+                File.Delete(zipPath);
             }
             else
             {
@@ -295,6 +327,7 @@ namespace Jackett.Common.Services
                 tarArchive.Close();
                 gzipStream.Close();
                 inStream.Close();
+                File.Delete(gzPath);
 
                 if (variant == Variants.JackettVariant.CoreMacOs || variant == Variants.JackettVariant.CoreMacOsArm64
                 || variant == Variants.JackettVariant.CoreLinuxAmdx64 || variant == Variants.JackettVariant.CoreLinuxArm32
