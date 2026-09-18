@@ -64,7 +64,9 @@ jobs:
         run: |
           set -euo pipefail
           mkdir -p "$RUNNER_TEMP/artifacts"
-          gh run download "$RUN_ID"             --repo "$GITHUB_REPOSITORY"             --dir "$RUNNER_TEMP/artifacts"
+          gh run download "$RUN_ID" \
+            --repo "$GITHUB_REPOSITORY" \
+            --dir "$RUNNER_TEMP/artifacts"
 
       - name: Prepare Jackett release package
         id: package
@@ -121,7 +123,10 @@ jobs:
             release_notes="$release_notes."
           fi
 
-          if existing_title="$(gh release view "$RELEASE_TAG"               --repo "$GITHUB_REPOSITORY"               --json name               --jq '.name' 2>/dev/null)"; then
+          if existing_title="$(gh release view "$RELEASE_TAG" \
+              --repo "$GITHUB_REPOSITORY" \
+              --json name \
+              --jq '.name' 2>/dev/null)"; then
             existing_version="${existing_title#v}"
             if [[ "$existing_version" =~ ^0\.24\.([0-9]+)$ ]]; then
               existing_build="${BASH_REMATCH[1]}"
@@ -132,9 +137,18 @@ jobs:
               fi
             fi
 
-            gh release edit "$RELEASE_TAG"               --repo "$GITHUB_REPOSITORY"               --title "$release_title"               --notes "$release_notes"
+            gh release edit "$RELEASE_TAG" \
+              --repo "$GITHUB_REPOSITORY" \
+              --title "$release_title" \
+              --notes "$release_notes"
           else
-            gh release create "$RELEASE_TAG"               --repo "$GITHUB_REPOSITORY"               --target master               --title "$release_title"               --notes "$release_notes"
+            gh release create "$RELEASE_TAG" \
+              --repo "$GITHUB_REPOSITORY" \
+              --target master \
+              --title "$release_title" \
+              --notes "$release_notes"
           fi
 
-          gh release upload "$RELEASE_TAG" "$ARCHIVE"             --repo "$GITHUB_REPOSITORY"             --clobber
+          gh release upload "$RELEASE_TAG" "$ARCHIVE" \
+            --repo "$GITHUB_REPOSITORY" \
+            --clobber
