@@ -390,6 +390,7 @@ namespace Jackett.Updater
                 "Definitions/devils-playground.yml",
                 "Definitions/devilsplayground.yml",
                 "Definitions/digbt.yml",
+                "Definitions/diginette-api.yml",
                 "Definitions/digitalcore.yml", // switch to *-API
                 "Definitions/divteam.yml",
                 "Definitions/documentarytorrents.yml",
@@ -940,6 +941,7 @@ namespace Jackett.Updater
                 "Definitions/yourbittorrent.yml",
                 "Definitions/yourexotic.yml", // renamed to exoticaz
                 "Definitions/zamundanet.yml",
+                "Definitions/zamundarip.yml", // renamed to zamundalife
                 "Definitions/zelkaorg.yml",
                 "Definitions/zetorrents.yml", // renamed to world-torrent #7574
                 "Definitions/zktorrent.yml",
