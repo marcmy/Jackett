@@ -1,0 +1,154 @@
+name: Publish rolling fork release
+
+on:
+  workflow_run:
+    workflows:
+      - Build custom artifacts
+    types:
+      - completed
+  workflow_dispatch:
+    inputs:
+      run_id:
+        description: Successful Build custom artifacts run ID to publish
+        required: true
+        type: string
+
+permissions: {}
+
+concurrency:
+  group: publish-fork-latest
+  cancel-in-progress: false
+
+jobs:
+  publish:
+    if: >-
+      github.event_name == 'workflow_dispatch' ||
+      (github.event.workflow_run.conclusion == 'success' &&
+       github.event.workflow_run.head_branch == 'master')
+    runs-on: ubuntu-24.04
+    timeout-minutes: 15
+
+    permissions:
+      actions: read
+      contents: write
+
+    steps:
+      - name: Resolve build run
+        id: run
+        shell: bash
+        env:
+          EVENT_NAME: ${{ github.event_name }}
+          WORKFLOW_RUN_ID: ${{ github.event.workflow_run.id }}
+          MANUAL_RUN_ID: ${{ inputs.run_id }}
+        run: |
+          set -euo pipefail
+
+          if [[ "$EVENT_NAME" == "workflow_dispatch" ]]; then
+            run_id="$MANUAL_RUN_ID"
+          else
+            run_id="$WORKFLOW_RUN_ID"
+          fi
+
+          [[ "$run_id" =~ ^[0-9]+$ ]] || {
+            echo "::error::Invalid workflow run ID: $run_id"
+            exit 1
+          }
+
+          echo "id=$run_id" >> "$GITHUB_OUTPUT"
+
+      - name: Download custom build artifact
+        shell: bash
+        env:
+          GH_TOKEN: ${{ github.token }}
+          RUN_ID: ${{ steps.run.outputs.id }}
+        run: |
+          set -euo pipefail
+          mkdir -p "$RUNNER_TEMP/artifacts"
+          gh run download "$RUN_ID" \
+            --repo "$GITHUB_REPOSITORY" \
+            --dir "$RUNNER_TEMP/artifacts"
+
+      - name: Prepare Jackett release package
+        id: package
+        shell: bash
+        run: |
+          set -euo pipefail
+
+          package_dir="$(find "$RUNNER_TEMP/artifacts" -type d -name Jackett -print -quit)"
+          if [[ -z "$package_dir" ]]; then
+            echo "::error::Downloaded artifact does not contain a Jackett directory."
+            exit 1
+          fi
+
+          for required in JackettConsole.exe JackettUpdater.exe JackettTray.exe JackettService.exe BUILD-INFO.txt; do
+            if [[ ! -f "$package_dir/$required" ]]; then
+              echo "::error::Downloaded artifact is missing $required."
+              exit 1
+            fi
+          done
+
+          version="$(sed -n 's/^version: //p' "$package_dir/BUILD-INFO.txt" | head -n 1 | tr -d '\r')"
+          if [[ ! "$version" =~ ^0\.24\.[0-9]+$ ]]; then
+            echo "::error::Unexpected build version: $version"
+            exit 1
+          fi
+
+          archive="$RUNNER_TEMP/Jackett.Binaries.Windows.zip"
+          rm -f "$archive"
+          (
+            cd "$(dirname "$package_dir")"
+            zip -qr "$archive" "$(basename "$package_dir")"
+          )
+
+          echo "version=$version" >> "$GITHUB_OUTPUT"
+          echo "archive=$archive" >> "$GITHUB_OUTPUT"
+
+      - name: Publish fork-latest release
+        shell: bash
+        env:
+          GH_TOKEN: ${{ github.token }}
+          RELEASE_TAG: fork-latest
+          VERSION: ${{ steps.package.outputs.version }}
+          ARCHIVE: ${{ steps.package.outputs.archive }}
+          SOURCE_SHA: ${{ github.event.workflow_run.head_sha }}
+          SOURCE_RUN: ${{ steps.run.outputs.id }}
+        run: |
+          set -euo pipefail
+
+          release_title="v$VERSION"
+          release_notes="Rolling Windows build of marcmy/Jackett from workflow run $SOURCE_RUN"
+          if [[ -n "${SOURCE_SHA:-}" ]]; then
+            release_notes="$release_notes (commit $SOURCE_SHA)."
+          else
+            release_notes="$release_notes."
+          fi
+
+          if existing_title="$(gh release view "$RELEASE_TAG" \
+              --repo "$GITHUB_REPOSITORY" \
+              --json name \
+              --jq '.name' 2>/dev/null)"; then
+            existing_version="${existing_title#v}"
+            if [[ "$existing_version" =~ ^0\.24\.([0-9]+)$ ]]; then
+              existing_build="${BASH_REMATCH[1]}"
+              new_build="${VERSION##*.}"
+              if (( new_build <= existing_build )); then
+                echo "fork-latest is already $existing_title; refusing stale build $release_title."
+                exit 0
+              fi
+            fi
+
+            gh release edit "$RELEASE_TAG" \
+              --repo "$GITHUB_REPOSITORY" \
+              --title "$release_title" \
+              --notes "$release_notes"
+          else
+            gh release create "$RELEASE_TAG" \
+              --repo "$GITHUB_REPOSITORY" \
+              --target master \
+              --title "$release_title" \
+              --notes "$release_notes"
+          fi
+
+          gh release upload "$RELEASE_TAG" "$ARCHIVE" \
+            --repo "$GITHUB_REPOSITORY" \
+            --clobber
