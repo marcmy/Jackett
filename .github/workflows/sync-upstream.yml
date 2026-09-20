@@ -3,8 +3,7 @@ name: Sync upstream
 on:
   workflow_dispatch:
   schedule:
-    # Daily at 09:17 UTC.
-    - cron: "17 13/3 * * *"
+    - cron: "17 8/3 * * *"
 
 permissions: {}
 
