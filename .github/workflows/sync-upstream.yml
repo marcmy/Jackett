@@ -48,14 +48,11 @@ jobs:
           upstream_sha="$(git rev-parse upstream/master)"
           original_head="$(git rev-parse HEAD)"
 
-          # Only fork-maintenance files belong here. Upstream-owned files such as
-          # codeql-analysis.yml intentionally remain free to follow upstream.
+          # The Actions token can write repository contents but cannot create or
+          # modify workflow files. Keep the fork's entire workflow tree stable
+          # during upstream merges, while still syncing upstream source changes.
           fork_owned=(
-            ".github/workflows/sync-upstream.yml"
-            ".github/workflows/build-artifacts.yml"
-            ".github/workflows/codeql-fork.yml"
-            ".github/workflows/supply-chain-audit.yml"
-            ".github/workflows/definitions-update-fork.yml"
+            ".github/workflows"
             ".github/dependabot.yml"
           )
 
@@ -63,7 +60,7 @@ jobs:
             local path
             for path in "${fork_owned[@]}"; do
               if git cat-file -e "${original_head}:${path}" 2>/dev/null; then
-                git checkout "$original_head" -- "$path"
+                git restore --source="$original_head" --staged --worktree -- "$path"
               fi
             done
           }
