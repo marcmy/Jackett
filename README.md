@@ -155,7 +155,6 @@ Prior versions of Jackett are no longer supported.
  * TheRARBG
  * Tokyo Tosho
  * Torrent Downloads
- * Torrent Oyun indir
  * Torrent[CORE]
  * torrent.by
  * torrent-pirat
@@ -359,6 +358,7 @@ Prior versions of Jackett are no longer supported.
  * DICMusic [![(invite needed)][inviteneeded]](#)
  * DigitalCore (DC)
  * DimeADozen (EzTorrent)
+ * DirtyBytes
  * DiscFan [![(invite needed)][inviteneeded]](#)
  * DocsPedia
  * DreadVault
@@ -621,7 +621,6 @@ Prior versions of Jackett are no longer supported.
  * The New Retro
  * The Occult (TO)
  * The Old School (TOS)
- * The Paradiese
  * The Place (TP)
  * The Show (TSBZ)
  * The Vault (TVBZ)
