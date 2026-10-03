@@ -51,6 +51,7 @@
 
   <!-- Conditionally obtain references for the .NET471 target -->
   <ItemGroup Condition=" '$(TargetFramework)' == 'net471' ">
+    <Compile Remove="Common\Utils\FlareSolverrIntegrationTests.cs" />
     <PackageReference Include="Microsoft.NETFramework.ReferenceAssemblies" Version="1.0.3" />
     <Reference Include="System.Web" />
   </ItemGroup>
