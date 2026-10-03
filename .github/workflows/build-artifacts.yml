@@ -9,6 +9,14 @@ on:
       - "Installer.iss"
       - "jackett_launcher.bat"
       - ".github/workflows/build-artifacts.yml"
+  pull_request:
+    branches:
+      - master
+    paths:
+      - "src/**"
+      - "Installer.iss"
+      - "jackett_launcher.bat"
+      - ".github/workflows/build-artifacts.yml"
   workflow_dispatch:
     inputs:
       source_ref:
@@ -60,6 +68,12 @@ jobs:
         uses: actions/setup-dotnet@a98b56852c35b8e3190ac28c8c2271da59106c68 # v6
         with:
           dotnet-version: 9.0.x
+
+      - name: Run regression tests
+        shell: pwsh
+        run: |
+          dotnet test src/Jackett.Test/Jackett.Test.csproj --framework net9.0 --configuration Release --filter "FullyQualifiedName~FlareSolverrIntegrationTests|FullyQualifiedName~CardigannIndexer"
+          if ($LASTEXITCODE -ne 0) { throw 'Jackett regression tests failed' }
 
       - name: Build Windows package
         shell: pwsh

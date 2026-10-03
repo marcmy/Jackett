@@ -7,6 +7,7 @@ using System.Net.Http;
 using System.Net.Security;
 using System.Security.Cryptography.X509Certificates;
 using System.Text;
+using System.Threading;
 using System.Threading.Tasks;
 using FlareSolverrSharp;
 using Jackett.Common.Helpers;
@@ -101,7 +102,8 @@ namespace Jackett.Common.Utils.Clients
         public override void SetTimeout(int seconds)
         {
             ClientTimeout = seconds;
-            client.Timeout = TimeSpan.FromSeconds(ClientTimeout);
+            clearanceHandlr.RequestTimeout = TimeSpan.FromSeconds(ClientTimeout);
+            client.Timeout = Timeout.InfiniteTimeSpan;
         }
 
         protected override async Task<WebResult> Run(WebRequest webRequest)
