@@ -9,10 +9,8 @@ type: semi-private
 encoding: windows-1251
 followredirect: true
 links:
-  - https://oct04.rudub.bet/
+  - https://oct05.rudub.bet/
 legacylinks:
-  - https://sep19.rudub.bet/
-  - http://sep20.rudub.bet/
   - https://sep20.rudub.bet/
   - http://sep21.rudub.bet/
   - https://sep21.rudub.bet/
@@ -41,6 +39,8 @@ legacylinks:
   - http://oct03.rudub.bet/
   - https://oct03.rudub.bet/
   - http://oct04.rudub.bet/
+  - https://oct04.rudub.bet/
+  - http://oct05.rudub.bet/
 caps:
   categorymappings:
     - {id: 1, cat: TV, desc: "TV"}
