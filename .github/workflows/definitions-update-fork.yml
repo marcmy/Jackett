@@ -36,7 +36,7 @@ jobs:
           echo "PREVIOUS_RUDUB_DOMAIN=$(date --date='yesterday' +'%b%d' | tr '[:upper:]' '[:lower:]').rudub.bet" >> "$GITHUB_ENV"
 
       - name: Update rudub definition
-        uses: mikefarah/yq@c14f446382944492701b16c1ddb48bb9dbe683e3 # v4.53.6
+        uses: mikefarah/yq@504fc38780cc46be8444ea1b72fb55919fc0bfb0 # v4.54.1
         with:
           cmd: yq -i '.legacylinks += "https://" + strenv(PREVIOUS_RUDUB_DOMAIN) + "/" | .legacylinks += "http://" + strenv(CURRENT_RUDUB_DOMAIN) + "/" | .links = ["https://" + strenv(CURRENT_RUDUB_DOMAIN) + "/"] | .legacylinks |= unique | .legacylinks = .legacylinks.[-30:]' src/Jackett.Common/Definitions/rudub.yml
 
