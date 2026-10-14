@@ -1,13 +1,6 @@
 name: Publish rolling fork release
 
 on:
-  workflow_run:
-    workflows:
-      - Build custom artifacts
-    branches:
-      - master
-    types:
-      - completed
   workflow_dispatch:
     inputs:
       run_id:
@@ -23,10 +16,6 @@ concurrency:
 
 jobs:
   publish:
-    if: >-
-      github.event_name == 'workflow_dispatch' ||
-      (github.event.workflow_run.conclusion == 'success' &&
-       github.event.workflow_run.head_branch == 'master')
     runs-on: ubuntu-24.04
     timeout-minutes: 15
 
@@ -39,17 +28,11 @@ jobs:
         id: run
         shell: bash
         env:
-          EVENT_NAME: ${{ github.event_name }}
-          WORKFLOW_RUN_ID: ${{ github.event.workflow_run.id }}
-          MANUAL_RUN_ID: ${{ inputs.run_id }}
+          RUN_ID: ${{ inputs.run_id }}
         run: |
           set -euo pipefail
 
-          if [[ "$EVENT_NAME" == "workflow_dispatch" ]]; then
-            run_id="$MANUAL_RUN_ID"
-          else
-            run_id="$WORKFLOW_RUN_ID"
-          fi
+          run_id="$RUN_ID"
 
           [[ "$run_id" =~ ^[0-9]+$ ]] || {
             echo "::error::Invalid workflow run ID: $run_id"
@@ -95,6 +78,12 @@ jobs:
             exit 1
           fi
 
+          source_sha="$(sed -n 's/^commit: //p' "$package_dir/BUILD-INFO.txt" | head -n 1 | tr -d '\r')"
+          if [[ ! "$source_sha" =~ ^[0-9a-f]{40}$ ]]; then
+            echo "::error::Unexpected source commit: $source_sha"
+            exit 1
+          fi
+
           archive="$RUNNER_TEMP/Jackett.Binaries.Windows.zip"
           rm -f "$archive"
           (
@@ -104,6 +93,7 @@ jobs:
 
           echo "version=$version" >> "$GITHUB_OUTPUT"
           echo "archive=$archive" >> "$GITHUB_OUTPUT"
+          echo "source_sha=$source_sha" >> "$GITHUB_OUTPUT"
 
       - name: Publish fork-latest release
         shell: bash
@@ -112,7 +102,7 @@ jobs:
           RELEASE_TAG: fork-latest
           VERSION: ${{ steps.package.outputs.version }}
           ARCHIVE: ${{ steps.package.outputs.archive }}
-          SOURCE_SHA: ${{ github.event.workflow_run.head_sha }}
+          SOURCE_SHA: ${{ steps.package.outputs.source_sha }}
           SOURCE_RUN: ${{ steps.run.outputs.id }}
         run: |
           set -euo pipefail
