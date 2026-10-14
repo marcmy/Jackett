@@ -181,6 +181,34 @@ jobs:
           retention-days: 30
           compression-level: 9
 
+  publish-release:
+    name: Start rolling release publication
+    needs: build-windows
+    if: >-
+      github.ref == 'refs/heads/master' &&
+      (github.event_name == 'push' || github.event_name == 'workflow_dispatch')
+    runs-on: ubuntu-24.04
+    timeout-minutes: 5
+
+    permissions:
+      actions: write
+
+    steps:
+      - name: Dispatch publication for this build
+        uses: actions/github-script@3a2844b7e9c422d3c10d287c895573f7108da1b3 # v9
+        with:
+          github-token: ${{ github.token }}
+          script: |
+            await github.rest.actions.createWorkflowDispatch({
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              workflow_id: 'publish-rolling-release.yml',
+              ref: 'master',
+              inputs: {
+                run_id: String(context.runId)
+              }
+            });
+
   update-scoop:
     name: Trigger scoop-bucket Excavator
     needs: build-windows
