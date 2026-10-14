@@ -259,6 +259,7 @@ namespace Jackett.Updater
                 "Definitions/adbt.yml",
                 "Definitions/afun.yml",
                 "Definitions/aither.yml", // switch to *-API #8682
+                "Definitions/alabala.yml", // switch to *-API
                 "Definitions/alein.yml",
                 "Definitions/alexfilm.yml",
                 "Definitions/alleenretail.yml",
@@ -465,6 +466,7 @@ namespace Jackett.Updater
                 "Definitions/gainbound.yml",
                 "Definitions/galeriens.yml",
                 "Definitions/gamera.yml",
+                "Definitions/gamestorrents.yml",
                 "Definitions/gay-torrentsorg.yml",
                 "Definitions/gdf76.yml",
                 "Definitions/generationfree.yml", // switch to unit3d api #12982
