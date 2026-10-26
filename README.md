@@ -70,9 +70,9 @@ A third-party Golang SDK for Jackett is available from [webtor-io/go-jackett](ht
 
 The currently supported version of Jackett is **0.24.+**, which is compatible with:
 
-- **Windows:** Windows 10 Version 1607 or greater ([full list](https://github.com/dotnet/core/blob/main/release-notes/9.0/supported-os.md#windows))
-- **Linux:** Various distributions ([full list](https://github.com/dotnet/core/blob/main/release-notes/9.0/supported-os.md#linux))
-- **macOS:** macOS 13.0+ (Ventura) or greater ([full list](https://github.com/dotnet/core/blob/main/release-notes/9.0/supported-os.md#apple))
+- **Windows:** Windows 10 Version 1607 or greater ([full list](https://github.com/dotnet/core/blob/main/release-notes/10.0/supported-os.md#windows))
+- **Linux:** Various distributions ([full list](https://github.com/dotnet/core/blob/main/release-notes/10.0/supported-os.md#linux))
+- **macOS:** macOS 13.0+ (Ventura) or greater ([full list](https://github.com/dotnet/core/blob/main/release-notes/10.0/supported-os.md#apple))
 
 Prior versions of Jackett are no longer supported.
 
@@ -746,7 +746,7 @@ This section covers installation on most common Linux distributions including Ub
 
 **Prerequisites:**
 - Most operating systems include all required dependencies
-- If dependencies are missing, refer to [.NET Required Packages](https://github.com/dotnet/core/blob/main/release-notes/9.0/os-packages.md)
+- If dependencies are missing, refer to [.NET Required Packages](https://github.com/dotnet/core/blob/main/release-notes/10.0/os-packages.md)
 
 #### Method 1: One-Command Installation (Easiest)
 
@@ -831,7 +831,7 @@ For modern ARM-based systems (Raspberry Pi, etc.)
 
 **Prerequisites:**
 - Most operating systems include all required dependencies
-- If dependencies are missing, refer to [.NET Required Packages](https://github.com/dotnet/core/blob/main/release-notes/9.0/os-packages.md)
+- If dependencies are missing, refer to [.NET Required Packages](https://github.com/dotnet/core/blob/main/release-notes/10.0/os-packages.md)
 
 #### Installing as a Service
 
@@ -1338,10 +1338,10 @@ git clone https://github.com/Jackett/Jackett.git
 cd Jackett/src
 
 # Build for .NET Core
-dotnet publish Jackett.Server -f net9.0 --self-contained -r osx-x64 -c Debug
+dotnet publish Jackett.Server -f net10.0 --self-contained -r osx-x64 -c Debug
 
 # Run Jackett
-./Jackett.Server/bin/Debug/net9.0/osx-x64/jackett
+./Jackett.Server/bin/Debug/net10.0/osx-x64/jackett
 ```
 
 ### Linux
@@ -1350,7 +1350,7 @@ dotnet publish Jackett.Server -f net9.0 --self-contained -r osx-x64 -c Debug
 
 ```bash
 # Install build tools (Debian/Ubuntu)
-sudo apt install nuget msbuild dotnet-sdk-9.0
+sudo apt install nuget msbuild dotnet-sdk-10.0
 
 # For other distributions, install equivalent packages
 ```
@@ -1363,10 +1363,10 @@ git clone https://github.com/Jackett/Jackett.git
 cd Jackett/src
 
 # Build for .NET Core
-dotnet publish Jackett.Server -f net9.0 --self-contained -r linux-x64 -c Debug
+dotnet publish Jackett.Server -f net10.0 --self-contained -r linux-x64 -c Debug
 
 # Run Jackett
-./Jackett.Server/bin/Debug/net9.0/linux-x64/jackett
+./Jackett.Server/bin/Debug/net10.0/linux-x64/jackett
 ```
 
 ---
