@@ -100,7 +100,7 @@ namespace Jackett.Test.Common.Utils
             using var canceled = new CancellationTokenSource();
             var queued = solver.Solve(request, cancellationToken: canceled.Token);
             canceled.Cancel();
-            Assert.CatchAsync<OperationCanceledException>(async () => await queued);
+            await Assert.CatchAsync<OperationCanceledException>(async () => await queued);
             Assert.That(calls, Is.EqualTo(1));
             release.SetResult(true);
             await Ready(first);
@@ -127,7 +127,7 @@ namespace Jackett.Test.Common.Utils
             var active = solver.Solve(request, cancellationToken: canceled.Token);
             await Ready(entered.Task);
             canceled.Cancel();
-            Assert.CatchAsync<OperationCanceledException>(async () => await active);
+            await Assert.CatchAsync<OperationCanceledException>(async () => await active);
             await Ready(solver.Solve(request));
             Assert.That(calls, Is.EqualTo(2));
         }
@@ -158,7 +158,7 @@ namespace Jackett.Test.Common.Utils
             using var solver = CreateSolver(token => Task.FromResult(Solution()), locker);
             solver.QueueTimeout = TimeSpan.FromMilliseconds(100);
             using var request = TrackerRequest();
-            var error = Assert.ThrowsAsync<TimeoutException>(async () => await solver.Solve(request));
+            var error = await Assert.ThrowsAsync<TimeoutException>(async () => await solver.Solve(request));
             Assert.That(error.Message, Does.Contain("browser slot"));
             release.SetResult(true);
             await Ready(occupying);
@@ -178,7 +178,7 @@ namespace Jackett.Test.Common.Utils
             using var request = TrackerRequest();
             await Ready(solver.Solve(request));
             solver.CleanupTimeout = TimeSpan.Zero;
-            var error = Assert.ThrowsAsync<FlareSolverrException>(async () => await solver.Solve(request));
+            var error = await Assert.ThrowsAsync<FlareSolverrException>(async () => await solver.Solve(request));
             Assert.That(error.Message, Does.Contain("clean up"));
         }
 
@@ -221,7 +221,7 @@ namespace Jackett.Test.Common.Utils
         }
 
         [Test]
-        public void SlowTrackerStillTimesOutWithoutAnOuterHttpClientDeadline()
+        public async Task SlowTrackerStillTimesOutWithoutAnOuterHttpClientDeadline()
         {
             using var handler = new ClearanceHandler(null)
             {
@@ -233,12 +233,12 @@ namespace Jackett.Test.Common.Utils
                 })
             };
             using var client = new HttpClient(handler) { Timeout = Timeout.InfiniteTimeSpan };
-            var error = Assert.ThrowsAsync<TimeoutException>(async () => await client.GetAsync("https://tracker.example/"));
+            var error = await Assert.ThrowsAsync<TimeoutException>(async () => await client.GetAsync("https://tracker.example/"));
             Assert.That(error.Message, Does.Contain("Tracker request timed out"));
         }
 
         [Test]
-        public void SlowTrackerBodyIsAlsoCoveredByNetworkDeadline()
+        public async Task SlowTrackerBodyIsAlsoCoveredByNetworkDeadline()
         {
             using var handler = new ClearanceHandler(null)
             {
@@ -249,7 +249,7 @@ namespace Jackett.Test.Common.Utils
                 }))
             };
             using var client = new HttpClient(handler) { Timeout = Timeout.InfiniteTimeSpan };
-            Assert.ThrowsAsync<TimeoutException>(async () => await client.GetAsync("https://tracker.example/"));
+            await Assert.ThrowsAsync<TimeoutException>(async () => await client.GetAsync("https://tracker.example/"));
         }
 
         private sealed class CallbackHandler : HttpMessageHandler
