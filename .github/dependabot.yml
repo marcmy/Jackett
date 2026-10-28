@@ -16,6 +16,11 @@ updates:
         update-types:
           - "minor"
           - "patch"
+    ignore:
+      # FluentAssertions 8+ is under the commercial Xceed license; stay on 7.x
+      # like upstream Jackett.
+      - dependency-name: "FluentAssertions"
+        versions: [">= 8.0.0"]
 
   - package-ecosystem: "github-actions"
     directory: "/"
