@@ -582,6 +582,7 @@ Prior versions of Jackett are no longer supported.
  * seedpool
  * SewerPT (下水道) [![(invite needed)][inviteneeded]](#)
  * SexTorrent
+ * Shadow
  * Shadowbit
  * ShaKaw [![(invite needed)][inviteneeded]](#)
  * Shareisland
@@ -688,6 +689,7 @@ Prior versions of Jackett are no longer supported.
  * Zappateers
  * Zenith [![(invite needed)][inviteneeded]](#)
  * ZmPT (织梦)
+ * ZooToons [![(invite needed)][inviteneeded]](#)
  * ZRPT (自然) [![(invite needed)][inviteneeded]](#)
 </details>
 
