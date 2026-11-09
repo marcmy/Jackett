@@ -8,6 +8,8 @@ updates:
       time: "12:00"
       timezone: "America/New_York"
     open-pull-requests-limit: 100
+    cooldown:
+      default-days: 7
     groups:
       routine-nuget:
         applies-to: version-updates
@@ -29,6 +31,8 @@ updates:
       time: "12:00"
       timezone: "America/New_York"
     open-pull-requests-limit: 100
+    cooldown:
+      default-days: 7
     groups:
       github-actions:
         patterns:
