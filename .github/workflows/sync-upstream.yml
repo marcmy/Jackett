@@ -20,6 +20,7 @@ jobs:
     permissions:
       actions: write
       contents: write
+      pull-requests: write
 
     steps:
       - name: Check out fork master
@@ -126,13 +127,15 @@ jobs:
               printf '%s\n' "$unresolved"
               echo '```'
               echo
-              echo "No source conflict was guessed or overwritten."
+              echo "No source conflict was guessed or overwritten. Opening a pull request to resolve them."
             } >> "$GITHUB_STEP_SUMMARY"
 
-            echo "::error::Unresolved upstream merge conflicts remain:"
+            echo "::warning::Unresolved upstream merge conflicts remain; opening a pull request to resolve them:"
             printf '%s\n' "$unresolved"
             git merge --abort || true
-            exit 1
+            echo "conflict=true" >> "$GITHUB_OUTPUT"
+            echo "base_sha=$original_head" >> "$GITHUB_OUTPUT"
+            exit 0
           fi
 
           if [[ "$merge_status" -ne 0 ]] && ! git rev-parse -q --verify MERGE_HEAD >/dev/null; then
@@ -159,8 +162,23 @@ jobs:
           echo "upstream_sha=$upstream_sha" >> "$GITHUB_OUTPUT"
           echo "head_sha=$head_sha" >> "$GITHUB_OUTPUT"
 
+      - name: Open conflict pull request
+        if: steps.sync.outputs.conflict == 'true'
+        shell: bash
+        env:
+          GH_TOKEN: ${{ secrets.SYNC_TOKEN || github.token }}
+          GH_REPO: ${{ github.repository }}
+          FORK_BRANCH: master
+          BASE_SHA: ${{ steps.sync.outputs.base_sha }}
+          UPSTREAM_REF: upstream/master
+          UPSTREAM_NAME: Jackett/Jackett@master
+          KEEP_FORK_PATHS: .github/workflows .github/dependabot.yml
+          MERGE_OPTS: -Xrenormalize
+          PR_NOTE: The sync normally auto-resolves content-equivalent conflicts and `.csproj` package-version bumps, so those files may be listed too.
+        run: bash .github/scripts/sync-conflict-pr.sh
+
       - name: Start artifact build
-        if: github.event_name == 'workflow_dispatch' || steps.sync.outputs.changed == 'true'
+        if: steps.sync.outputs.conflict != 'true' && (github.event_name == 'workflow_dispatch' || steps.sync.outputs.changed == 'true')
         uses: actions/github-script@3a2844b7e9c422d3c10d287c895573f7108da1b3 # v9
         env:
           SOURCE_REF: ${{ steps.sync.outputs.head_sha }}
