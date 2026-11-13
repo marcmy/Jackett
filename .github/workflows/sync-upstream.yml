@@ -15,6 +15,7 @@ jobs:
   sync:
     name: Merge Jackett upstream master
     runs-on: ubuntu-24.04
+    environment: upstream-sync
     timeout-minutes: 15
 
     permissions:
