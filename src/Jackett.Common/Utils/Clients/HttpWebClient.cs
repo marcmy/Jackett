@@ -7,6 +7,7 @@ using System.Net.Http;
 using System.Net.Security;
 using System.Security.Cryptography.X509Certificates;
 using System.Text;
+using System.Threading;
 using System.Threading.Tasks;
 using FlareSolverrSharp;
 using Jackett.Common.Helpers;
@@ -94,7 +95,8 @@ namespace Jackett.Common.Utils.Clients
                     clearanceHandlr.InnerHandler = clientHandlr;
                     using (var client = new HttpClient(clearanceHandlr))
                     {
-                        client.Timeout = TimeSpan.FromSeconds(ClientTimeout);
+                        clearanceHandlr.RequestTimeout = TimeSpan.FromSeconds(ClientTimeout);
+                        client.Timeout = Timeout.InfiniteTimeSpan;
                         using (var request = new HttpRequestMessage())
                         {
                             request.Headers.ExpectContinue = false;

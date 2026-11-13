@@ -8,49 +8,46 @@ language: ru-RU
 type: semi-private
 encoding: windows-1251
 followredirect: true
-
 links:
-  - https://r4.rudub.world/
+  - https://nov12.rudub.bet/
 legacylinks:
-  - http://dec13.rudub.bet/
-  - https://dec13.rudub.bet/
-  - http://dec14.rudub.bet/
-  - https://dec14.rudub.bet/
-  - http://dec15.rudub.bet/
-  - https://dec15.rudub.bet/
-  - http://dec16.rudub.bet/
-  - https://dec16.rudub.bet/
-  - http://dec17.rudub.bet/
-  - https://dec17.rudub.bet/
-  - http://dec18.rudub.bet/
-  - https://dec18.rudub.bet/
-  - http://dec19.rudub.bet/
-  - https://dec19.rudub.bet/
-  - http://dec20.rudub.bet/
-  - https://dec20.rudub.bet/
-  - http://dec21.rudub.bet/
-  - https://dec21.rudub.bet/
-  - http://dec22.rudub.bet/
-  - https://dec22.rudub.bet/
-  - http://dec23.rudub.bet/
-  - https://dec23.rudub.bet/
-  - http://dec24.rudub.bet/
-  - https://dec24.rudub.bet/
-  - http://dec25.rudub.bet/
-  - https://dec25.rudub.bet/
-  - http://dec26.rudub.bet/
-  - https://dec26.rudub.bet/
-  - https://r2.rudub.world/
-
+  - https://oct25.rudub.bet/
+  - http://oct26.rudub.bet/
+  - https://oct26.rudub.bet/
+  - http://oct27.rudub.bet/
+  - https://oct27.rudub.bet/
+  - http://oct28.rudub.bet/
+  - https://oct28.rudub.bet/
+  - http://oct29.rudub.bet/
+  - https://oct29.rudub.bet/
+  - http://oct30.rudub.bet/
+  - https://oct30.rudub.bet/
+  - http://oct31.rudub.bet/
+  - https://oct31.rudub.bet/
+  - http://nov01.rudub.bet/
+  - https://nov01.rudub.bet/
+  - http://nov02.rudub.bet/
+  - https://nov02.rudub.bet/
+  - http://nov03.rudub.bet/
+  - https://nov03.rudub.bet/
+  - http://nov04.rudub.bet/
+  - https://nov04.rudub.bet/
+  - http://nov05.rudub.bet/
+  - https://nov05.rudub.bet/
+  - http://nov06.rudub.bet/
+  - https://nov09.rudub.bet/
+  - http://nov10.rudub.bet/
+  - https://nov10.rudub.bet/
+  - http://nov11.rudub.bet/
+  - https://nov11.rudub.bet/
+  - http://nov12.rudub.bet/
 caps:
   categorymappings:
     - {id: 1, cat: TV, desc: "TV"}
-
   modes:
     search: [q]
     tv-search: [q, season, ep]
   allowrawsearch: true
-
 settings:
   - name: username
     type: text
@@ -86,7 +83,6 @@ settings:
     options:
       desc: desc
       asc: asc
-
 login:
   path: takelogin.php
   method: post
@@ -98,27 +94,22 @@ login:
   test:
     path: browse.php
     selector: a[href="logout.php"]
-
 search:
   paths:
     # http://rudub.tv/browse.php?search=&incldead=1&sort=4&type=desc
     - path: browse.php
-
   inputs:
     search: "{{ .Keywords }}"
     # 0 incldead, 1 active, 2 onlydead, 3 gold, 4 seedfree
     incldead: "{{ if .Config.freeleech }}3{{ else }}0{{ end }}"
     sort: "{{ .Config.sort }}"
     type: "{{ .Config.type }}"
-
   keywordsfilters:
     # strip season and/or ep
     - name: re_replace
       args: ["(?i)\\b(?:[SE]\\d{1,4}){1,2}\\b\\s?", ""]
-
   rows:
     selector: div.card__torlist__browse_2
-
   fields:
     category:
       text: 1

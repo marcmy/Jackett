@@ -1,0 +1,23 @@
+﻿<Project Sdk="Microsoft.NET.Sdk">
+  <PropertyGroup>
+    <TargetFramework>netstandard2.0</TargetFramework>
+    <LangVersion>9</LangVersion>
+    <PackageId>FlareSolverrSharp</PackageId>
+    <RootNamespace>FlareSolverrSharp</RootNamespace>
+    <Version>4.0.0</Version>
+    <Authors>Diego Heras (ngosang)</Authors>
+    <Description>FlareSolverr .Net / Proxy server to bypass Cloudflare protection.</Description>
+    <PackageTags>flaresolverr, flaresolver, cloudflare, solver, bypass, protection, solving, library, cloudflaresolver, delegatinghandler, recaptcha, captcha, javascript, challenge, utilities</PackageTags>
+    <RepositoryUrl>https://github.com/FlareSolverr/FlareSolverrSharp</RepositoryUrl>
+    <PackageProjectUrl>https://github.com/FlareSolverr/FlareSolverrSharp</PackageProjectUrl>
+    <PackageLicenseUrl>https://github.com/FlareSolverr/FlareSolverrSharp/blob/master/LICENSE</PackageLicenseUrl>
+    <PackageRequireLicenseAcceptance>true</PackageRequireLicenseAcceptance>
+    <AssemblyName>FlareSolverrSharp</AssemblyName>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <PackageReference Include="Newtonsoft.Json" Version="13.0.4" />
+    <InternalsVisibleTo Include="Jackett.Test" />
+    <None Update="LICENSE" CopyToOutputDirectory="PreserveNewest" TargetPath="licenses\FlareSolverrSharp\LICENSE" />
+  </ItemGroup>
+</Project>

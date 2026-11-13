@@ -24,11 +24,12 @@ namespace Jackett.Common.Utils
             {
                 Layout = "${longdate} ${level} ${message}${onexception:inner=${newline}${newline}[v${assembly-version}] ${exception:format=ToString}${newline}}",
                 FileName = Path.Combine(settings.DataFolder, logFileName),
-                ArchiveFileName = Path.Combine(settings.DataFolder, logFileName + ".{#####}.txt"),
                 ArchiveAboveSize = 2097152, // 2 MB
                 MaxArchiveFiles = 5,
                 KeepFileOpen = false,
-                ArchiveNumbering = ArchiveNumberingMode.DateAndSequence
+                // NLog 6 uses suffix-based rotation; include date and sequence to
+                // retain distinct archives without the removed ArchiveNumberingMode.
+                ArchiveSuffixFormat = "_{1:yyyyMMdd}_{0:00000}"
             };
             logConfig.AddTarget("file", logFile);
 

@@ -174,13 +174,7 @@ namespace Jackett.Common.Utils.Clients
         {
             if (logger.IsDebugEnabled) // performance optimization
             {
-                var postData = "";
-                if (request.Type == RequestType.POST)
-                {
-                    var lines = request.PostData?.Select(kvp => kvp.Key + "=" + kvp.Value).ToList() ?? new List<string>();
-                    postData = $" PostData: {{{string.Join(", ", lines)}}} RawBody: {request.RawBody}";
-                }
-                logger.Debug($"WebClient({ClientType}).GetResultAsync(Method: {request.Type} Url: {request.Url}{postData})");
+                logger.Debug($"WebClient({ClientType}).GetResultAsync(Method: {request.Type} Request details: [redacted])");
             }
 
             PrepareRequest(request);
