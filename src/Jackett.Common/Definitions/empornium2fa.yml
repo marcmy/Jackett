@@ -110,6 +110,7 @@ search:
       attribute: href
     description_tags:
       selector: div.tags
+      optional: true
     description:
       case:
         span.icon_okay: "Verified: {{ .Result.description_tags }}"
