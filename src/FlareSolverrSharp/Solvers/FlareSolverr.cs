@@ -42,9 +42,9 @@ namespace FlareSolverrSharp.Solvers
         }
 
         public async Task<FlareSolverrResponse> Solve(HttpRequestMessage request, string sessionId = "",
-            CancellationToken cancellationToken = default)
+            CancellationToken cancellationToken = default, FlareSolverrRequestCookie[] cookies = null)
         {
-            return await SendFlareSolverrRequest(GenerateFlareSolverrRequest(request, sessionId), cancellationToken);
+            return await SendFlareSolverrRequest(GenerateFlareSolverrRequest(request, sessionId, cookies), cancellationToken);
         }
 
         public async Task<FlareSolverrResponse> CreateSession()
@@ -204,8 +204,11 @@ namespace FlareSolverrSharp.Solvers
             return content;
         }
 
-        private HttpContent GenerateFlareSolverrRequest(HttpRequestMessage request, string sessionId = "")
+        private HttpContent GenerateFlareSolverrRequest(HttpRequestMessage request, string sessionId = "",
+            FlareSolverrRequestCookie[] cookies = null)
         {
+            if (cookies != null && cookies.Length == 0)
+                cookies = null;
             FlareSolverrRequest req;
             if (string.IsNullOrWhiteSpace(sessionId))
                 sessionId = null;
@@ -222,7 +225,8 @@ namespace FlareSolverrSharp.Solvers
                     Url = url,
                     MaxTimeout = MaxTimeout,
                     Proxy = proxy,
-                    Session = sessionId
+                    Session = sessionId,
+                    Cookies = cookies
                 };
             }
             else if (request.Method == HttpMethod.Post)
@@ -238,7 +242,8 @@ namespace FlareSolverrSharp.Solvers
                         PostData = request.Content.ReadAsStringAsync().Result,
                         MaxTimeout = MaxTimeout,
                         Proxy = proxy,
-                        Session = sessionId
+                        Session = sessionId,
+                        Cookies = cookies
                     };
                 }
                 else if (contentMediaType.Contains("multipart/form-data")

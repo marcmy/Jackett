@@ -39,31 +39,157 @@ namespace Jackett.Test.Common.Utils
         }
 
         [Test]
-        public async Task TwoSolvesRunConcurrentlyAndThirdWaitsAcrossClients()
+        public async Task SlotLimitIsSharedAcrossClientsAndExtraSolveWaits()
         {
+            var slots = SemaphoreLocker.DefaultConcurrency;
             var entered = Signal();
             var release = Signal();
             var calls = 0;
             var endpoint = "http://solver.example/" + Guid.NewGuid() + "/";
             async Task<HttpResponseMessage> Send(CancellationToken token)
             {
-                if (Interlocked.Increment(ref calls) == 2)
+                if (Interlocked.Increment(ref calls) == slots)
                     entered.TrySetResult(true);
                 await release.Task;
                 return Solution();
             }
-            using var first = CreateSolver(Send, endpoint: endpoint);
-            using var second = CreateSolver(Send, endpoint: endpoint);
-            using var third = CreateSolver(Send, endpoint: endpoint);
+            var solvers = new Solver[slots + 1];
+            for (var i = 0; i < solvers.Length; i++)
+                solvers[i] = CreateSolver(Send, endpoint: endpoint);
             using var request = TrackerRequest();
-            var a = first.Solve(request);
-            var b = second.Solve(request);
+            var running = new Task[slots];
+            for (var i = 0; i < slots; i++)
+                running[i] = solvers[i].Solve(request);
             await Ready(entered.Task);
-            var c = third.Solve(request);
-            Assert.That(calls, Is.EqualTo(2));
+            var waiting = solvers[slots].Solve(request);
+            Assert.That(calls, Is.EqualTo(slots));
             release.SetResult(true);
-            await Ready(Task.WhenAll(a, b, c));
-            Assert.That(calls, Is.EqualTo(3));
+            await Ready(Task.WhenAll(Task.WhenAll(running), waiting));
+            Assert.That(calls, Is.EqualTo(slots + 1));
+            foreach (var solver in solvers)
+                solver.Dispose();
+        }
+
+        [TestCase(null, 4)]
+        [TestCase("", 4)]
+        [TestCase("abc", 4)]
+        [TestCase("0", 4)]
+        [TestCase("-3", 4)]
+        [TestCase("1", 1)]
+        [TestCase("6", 6)]
+        [TestCase("99", 16)]
+        public void SlotLimitIsReadFromEnvironmentValue(string value, int expected) =>
+            Assert.That(SemaphoreLocker.ReadConcurrency(value), Is.EqualTo(expected));
+
+        [Test]
+        public async Task RejectedCookiesFallBackToSolverPageAndSkipLaterRetries()
+        {
+            var host = Guid.NewGuid().ToString("N") + ".example";
+            var trackerCalls = 0;
+            var solves = 0;
+            using var handler = new ClearanceHandler("http://solver.example/",
+                CreateSolver(token =>
+                {
+                    Interlocked.Increment(ref solves);
+                    return Task.FromResult(new HttpResponseMessage(HttpStatusCode.OK)
+                    {
+                        Content = new StringContent("{\"status\":\"ok\",\"solution\":{\"status\":200," +
+                            "\"response\":\"<html>browser results</html>\",\"userAgent\":\"test-browser\"," +
+                            "\"cookies\":[{\"name\":\"cf_clearance\",\"value\":\"clearance\"}]}}")
+                    });
+                }, new SemaphoreLocker(1)))
+            {
+                // Every direct request is challenged, even with the clearance cookie.
+                InnerHandler = new TrackerHandler(token =>
+                {
+                    Interlocked.Increment(ref trackerCalls);
+                    var response = new HttpResponseMessage(HttpStatusCode.Forbidden)
+                    {
+                        Content = new StringContent("<title>Just a moment...</title>")
+                    };
+                    response.Headers.TryAddWithoutValidation("Server", "cloudflare");
+                    return Task.FromResult(response);
+                })
+            };
+            using var client = new HttpClient(handler) { Timeout = Timeout.InfiniteTimeSpan };
+
+            using (var first = await client.GetAsync($"https://{host}/search?q=a"))
+            {
+                Assert.That(first.StatusCode, Is.EqualTo(HttpStatusCode.OK));
+                Assert.That(await first.Content.ReadAsStringAsync(), Is.EqualTo("<html>browser results</html>"));
+                Assert.That(first.Headers.GetValues("Set-Cookie"), Does.Contain("cf_clearance=clearance"));
+            }
+            Assert.That(trackerCalls, Is.EqualTo(2), "First search tries the cookies once.");
+
+            using (var second = await client.GetAsync($"https://{host}/search?q=b"))
+                Assert.That(await second.Content.ReadAsStringAsync(), Is.EqualTo("<html>browser results</html>"));
+            Assert.That(trackerCalls, Is.EqualTo(3), "Known-rejected host skips the cookie retry.");
+            Assert.That(solves, Is.EqualTo(2));
+        }
+
+        [Test]
+        public async Task TrackerSessionCookiesAreSentToSolverWithoutCloudflareCookies()
+        {
+            var host = Guid.NewGuid().ToString("N") + ".example";
+            string solverBody = null;
+            var solverClient = new HttpClient(new CaptureHandler(async request =>
+            {
+                solverBody = await request.Content.ReadAsStringAsync();
+                return new HttpResponseMessage(HttpStatusCode.OK)
+                {
+                    Content = new StringContent("{\"status\":\"ok\",\"solution\":{\"status\":200," +
+                        "\"response\":\"<a href=\\\"/logout.php\\\">logout</a>\"," +
+                        "\"cookies\":[{\"name\":\"cf_clearance\",\"value\":\"fresh\"}]}}")
+                };
+            })) { Timeout = Timeout.InfiniteTimeSpan };
+            using var solver = new Solver("http://solver.example/" + Guid.NewGuid() + "/", solverClient, new SemaphoreLocker(1));
+            var tracker = new TrackerHandler(token =>
+            {
+                var response = new HttpResponseMessage(HttpStatusCode.Forbidden)
+                {
+                    Content = new StringContent("<title>Just a moment...</title>")
+                };
+                response.Headers.TryAddWithoutValidation("Server", "cloudflare");
+                return Task.FromResult(response);
+            });
+            var jar = ((HttpClientHandler)tracker.InnerHandler).CookieContainer;
+            jar.Add(new Uri($"https://{host}/"), new System.Net.Cookie("uid", "42"));
+            jar.Add(new Uri($"https://{host}/"), new System.Net.Cookie("cf_clearance", "stale"));
+            using var handler = new ClearanceHandler("http://solver.example/", solver) { InnerHandler = tracker };
+            using var client = new HttpClient(handler) { Timeout = Timeout.InfiniteTimeSpan };
+
+            using var page = await client.GetAsync($"https://{host}/");
+
+            Assert.That(await page.Content.ReadAsStringAsync(), Does.Contain("/logout.php"));
+            Assert.That(solverBody, Does.Contain("\"cookies\":[{\"name\":\"uid\",\"value\":\"42\"}]"));
+            Assert.That(solverBody, Does.Not.Contain("stale"));
+        }
+
+        [Test]
+        public async Task RejectedCookiesStillFailForPostRequests()
+        {
+            var host = Guid.NewGuid().ToString("N") + ".example";
+            using var handler = new ClearanceHandler("http://solver.example/",
+                CreateSolver(token => Task.FromResult(new HttpResponseMessage(HttpStatusCode.OK)
+                {
+                    Content = new StringContent("{\"status\":\"ok\",\"solution\":{\"status\":200," +
+                        "\"response\":\"<html>page</html>\",\"cookies\":[{\"name\":\"cf_clearance\",\"value\":\"x\"}]}}")
+                }), new SemaphoreLocker(1)))
+            {
+                InnerHandler = new TrackerHandler(token =>
+                {
+                    var response = new HttpResponseMessage(HttpStatusCode.Forbidden)
+                    {
+                        Content = new StringContent("<title>Just a moment...</title>")
+                    };
+                    response.Headers.TryAddWithoutValidation("Server", "cloudflare");
+                    return Task.FromResult(response);
+                })
+            };
+            using var client = new HttpClient(handler) { Timeout = Timeout.InfiniteTimeSpan };
+            using var form = new FormUrlEncodedContent(new[] { new System.Collections.Generic.KeyValuePair<string, string>("q", "a") });
+            var error = await Assert.ThrowsAsync<FlareSolverrException>(async () => await client.PostAsync($"https://{host}/search", form));
+            Assert.That(error.Message, Does.Contain("cookies provided by FlareSolverr are not valid"));
         }
 
         [Test]
@@ -257,6 +383,13 @@ namespace Jackett.Test.Common.Utils
             private readonly Func<CancellationToken, Task<HttpResponseMessage>> _send;
             public CallbackHandler(Func<CancellationToken, Task<HttpResponseMessage>> send) => _send = send;
             protected override Task<HttpResponseMessage> SendAsync(HttpRequestMessage request, CancellationToken token) => _send(token);
+        }
+
+        private sealed class CaptureHandler : HttpMessageHandler
+        {
+            private readonly Func<HttpRequestMessage, Task<HttpResponseMessage>> _send;
+            public CaptureHandler(Func<HttpRequestMessage, Task<HttpResponseMessage>> send) => _send = send;
+            protected override Task<HttpResponseMessage> SendAsync(HttpRequestMessage request, CancellationToken token) => _send(request);
         }
 
         private sealed class TrackerHandler : DelegatingHandler

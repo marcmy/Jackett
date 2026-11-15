@@ -1,7 +1,9 @@
 using System;
+using System.Collections.Concurrent;
 using System.Linq;
 using System.Net;
 using System.Net.Http;
+using System.Text;
 using System.Threading;
 using System.Threading.Tasks;
 using FlareSolverrSharp.Constants;
@@ -22,6 +24,13 @@ namespace FlareSolverrSharp
         private volatile FlareSolverr _flareSolverr;
         private readonly object _solverLock = new object();
         private string _userAgent;
+
+        // Hosts whose Cloudflare clearance cookies were rejected when replayed outside the
+        // browser (Cloudflare can bind them to Chrome's network fingerprint). For these,
+        // GET requests use the page FlareSolverr already loaded instead of retrying.
+        private static readonly ConcurrentDictionary<string, DateTime> CookieRejectedHosts =
+            new ConcurrentDictionary<string, DateTime>(StringComparer.OrdinalIgnoreCase);
+        internal static TimeSpan CookieRejectionMemory = TimeSpan.FromHours(6);
 
         /// <summary>
         /// Max timeout to solve the challenge.
@@ -117,7 +126,10 @@ namespace FlareSolverrSharp
 
                 // Resolve the challenge using FlareSolverr API
                 response.Dispose();
-                var flareSolverrResponse = await _flareSolverr.Solve(request, cancellationToken: cancellationToken);
+                // Send the tracker's own cookies (login session, cookie-method indexers) so the
+                // browser loads the page as the logged-in user.
+                var flareSolverrResponse = await _flareSolverr.Solve(request, cancellationToken: cancellationToken,
+                    cookies: GetTrackerCookies(request));
 
                 if (flareSolverrResponse == null)
                 {
@@ -146,13 +158,26 @@ namespace FlareSolverrSharp
 
                 // Change the cookies in the original request with the cookies provided by FlareSolverr
                 InjectCookies(request, flareSolverrResponse);
+
+                var canUseSolverPage = CanUseSolverPage(request, flareSolverrResponse);
+                if (canUseSolverPage && CookiesKnownRejected(request.RequestUri))
+                {
+                    return CreateSolverPageResponse(request, flareSolverrResponse);
+                }
+
                 response = await SendTrackerRequestAsync(request, cancellationToken).ConfigureAwait(false);
 
                 // Detect if there is a challenge in the response
                 if (ChallengeDetector.IsClearanceRequired(response))
                 {
                     response.Dispose();
-                    throw new FlareSolverrException("The cookies provided by FlareSolverr are not valid");
+                    if (!canUseSolverPage)
+                    {
+                        throw new FlareSolverrException("The cookies provided by FlareSolverr are not valid");
+                    }
+
+                    CookieRejectedHosts[request.RequestUri.Host] = DateTime.UtcNow + CookieRejectionMemory;
+                    return CreateSolverPageResponse(request, flareSolverrResponse);
                 }
 
                 // Add the "Set-Cookie" header in the response with the cookies provided by FlareSolverr
@@ -284,6 +309,65 @@ namespace FlareSolverrSharp
             {
                 response.Headers.Add(HttpHeaders.SetCookie, rCookie.ToHeaderValue());
             }
+        }
+
+        private FlareSolverrRequestCookie[] GetTrackerCookies(HttpRequestMessage request)
+        {
+            var handler = HttpClientHandler;
+            var pairs = handler != null && handler.UseCookies
+                ? handler.CookieContainer.GetCookies(request.RequestUri).Cast<Cookie>()
+                    .Where(cookie => !cookie.Expired)
+                    .Select(cookie => (cookie.Name, cookie.Value))
+                : request.Headers.TryGetValues(HttpHeaders.Cookie, out var headers)
+                    ? headers.SelectMany(header => header.Split(';'))
+                        .Select(part => part.Split(new[] { '=' }, 2))
+                        .Where(part => part.Length == 2)
+                        .Select(part => (Name: part[0].Trim(), Value: part[1].Trim()))
+                    : Enumerable.Empty<(string Name, string Value)>();
+
+            // Cloudflare cookies are left out: the browser earns its own clearance.
+            return pairs
+                .Where(pair => pair.Name.Length > 0 && !IsCloudflareCookie(pair.Name))
+                .GroupBy(pair => pair.Name)
+                .Select(group => new FlareSolverrRequestCookie { Name = group.Key, Value = group.Last().Value })
+                .ToArray();
+        }
+
+        private static bool CookiesKnownRejected(Uri uri)
+        {
+            if (!CookieRejectedHosts.TryGetValue(uri.Host, out var until))
+            {
+                return false;
+            }
+
+            if (until > DateTime.UtcNow)
+            {
+                return true;
+            }
+
+            CookieRejectedHosts.TryRemove(uri.Host, out _);
+            return false;
+        }
+
+        // Only a GET can be answered from the browser's page: FlareSolverr has already made the
+        // request, so returning its page is equivalent and avoids replaying it.
+        private static bool CanUseSolverPage(HttpRequestMessage request, FlareSolverrResponse flareSolverrResponse) =>
+            request.Method == HttpMethod.Get && !string.IsNullOrEmpty(flareSolverrResponse.Solution.Response);
+
+        private static HttpResponseMessage CreateSolverPageResponse(HttpRequestMessage request,
+            FlareSolverrResponse flareSolverrResponse)
+        {
+            var solution = flareSolverrResponse.Solution;
+            var status = int.TryParse(solution.Status, out var code) && code >= 100 && code <= 599
+                ? (HttpStatusCode)code
+                : HttpStatusCode.OK;
+            var response = new HttpResponseMessage(status)
+            {
+                RequestMessage = request,
+                Content = new StringContent(solution.Response, Encoding.UTF8, "text/html")
+            };
+            InjectSetCookieHeader(response, flareSolverrResponse);
+            return response;
         }
 
         private static bool IsCloudflareCookie(string cookieName) =>
