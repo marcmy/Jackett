@@ -128,6 +128,44 @@ namespace Jackett.Test.Common.Utils
         }
 
         [Test]
+        public async Task TrackerSessionCookiesAreSentToSolverWithoutCloudflareCookies()
+        {
+            var host = Guid.NewGuid().ToString("N") + ".example";
+            string solverBody = null;
+            var solverClient = new HttpClient(new CaptureHandler(async request =>
+            {
+                solverBody = await request.Content.ReadAsStringAsync();
+                return new HttpResponseMessage(HttpStatusCode.OK)
+                {
+                    Content = new StringContent("{\"status\":\"ok\",\"solution\":{\"status\":200," +
+                        "\"response\":\"<a href=\\\"/logout.php\\\">logout</a>\"," +
+                        "\"cookies\":[{\"name\":\"cf_clearance\",\"value\":\"fresh\"}]}}")
+                };
+            })) { Timeout = Timeout.InfiniteTimeSpan };
+            using var solver = new Solver("http://solver.example/" + Guid.NewGuid() + "/", solverClient, new SemaphoreLocker(1));
+            var tracker = new TrackerHandler(token =>
+            {
+                var response = new HttpResponseMessage(HttpStatusCode.Forbidden)
+                {
+                    Content = new StringContent("<title>Just a moment...</title>")
+                };
+                response.Headers.TryAddWithoutValidation("Server", "cloudflare");
+                return Task.FromResult(response);
+            });
+            var jar = ((HttpClientHandler)tracker.InnerHandler).CookieContainer;
+            jar.Add(new Uri($"https://{host}/"), new System.Net.Cookie("uid", "42"));
+            jar.Add(new Uri($"https://{host}/"), new System.Net.Cookie("cf_clearance", "stale"));
+            using var handler = new ClearanceHandler("http://solver.example/", solver) { InnerHandler = tracker };
+            using var client = new HttpClient(handler) { Timeout = Timeout.InfiniteTimeSpan };
+
+            using var page = await client.GetAsync($"https://{host}/");
+
+            Assert.That(await page.Content.ReadAsStringAsync(), Does.Contain("/logout.php"));
+            Assert.That(solverBody, Does.Contain("\"cookies\":[{\"name\":\"uid\",\"value\":\"42\"}]"));
+            Assert.That(solverBody, Does.Not.Contain("stale"));
+        }
+
+        [Test]
         public async Task RejectedCookiesStillFailForPostRequests()
         {
             var host = Guid.NewGuid().ToString("N") + ".example";
@@ -345,6 +383,13 @@ namespace Jackett.Test.Common.Utils
             private readonly Func<CancellationToken, Task<HttpResponseMessage>> _send;
             public CallbackHandler(Func<CancellationToken, Task<HttpResponseMessage>> send) => _send = send;
             protected override Task<HttpResponseMessage> SendAsync(HttpRequestMessage request, CancellationToken token) => _send(token);
+        }
+
+        private sealed class CaptureHandler : HttpMessageHandler
+        {
+            private readonly Func<HttpRequestMessage, Task<HttpResponseMessage>> _send;
+            public CaptureHandler(Func<HttpRequestMessage, Task<HttpResponseMessage>> send) => _send = send;
+            protected override Task<HttpResponseMessage> SendAsync(HttpRequestMessage request, CancellationToken token) => _send(request);
         }
 
         private sealed class TrackerHandler : DelegatingHandler

@@ -126,7 +126,10 @@ namespace FlareSolverrSharp
 
                 // Resolve the challenge using FlareSolverr API
                 response.Dispose();
-                var flareSolverrResponse = await _flareSolverr.Solve(request, cancellationToken: cancellationToken);
+                // Send the tracker's own cookies (login session, cookie-method indexers) so the
+                // browser loads the page as the logged-in user.
+                var flareSolverrResponse = await _flareSolverr.Solve(request, cancellationToken: cancellationToken,
+                    cookies: GetTrackerCookies(request));
 
                 if (flareSolverrResponse == null)
                 {
@@ -306,6 +309,28 @@ namespace FlareSolverrSharp
             {
                 response.Headers.Add(HttpHeaders.SetCookie, rCookie.ToHeaderValue());
             }
+        }
+
+        private FlareSolverrRequestCookie[] GetTrackerCookies(HttpRequestMessage request)
+        {
+            var handler = HttpClientHandler;
+            var pairs = handler != null && handler.UseCookies
+                ? handler.CookieContainer.GetCookies(request.RequestUri).Cast<Cookie>()
+                    .Where(cookie => !cookie.Expired)
+                    .Select(cookie => (cookie.Name, cookie.Value))
+                : request.Headers.TryGetValues(HttpHeaders.Cookie, out var headers)
+                    ? headers.SelectMany(header => header.Split(';'))
+                        .Select(part => part.Split(new[] { '=' }, 2))
+                        .Where(part => part.Length == 2)
+                        .Select(part => (Name: part[0].Trim(), Value: part[1].Trim()))
+                    : Enumerable.Empty<(string Name, string Value)>();
+
+            // Cloudflare cookies are left out: the browser earns its own clearance.
+            return pairs
+                .Where(pair => pair.Name.Length > 0 && !IsCloudflareCookie(pair.Name))
+                .GroupBy(pair => pair.Name)
+                .Select(group => new FlareSolverrRequestCookie { Name = group.Key, Value = group.Last().Value })
+                .ToArray();
         }
 
         private static bool CookiesKnownRejected(Uri uri)
