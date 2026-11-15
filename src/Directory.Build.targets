@@ -1,0 +1,18 @@
+<Project>
+    <!--
+      Fork-owned (upstream has no Directory.Build.targets, so syncs never touch this file).
+
+      The fork builds Jackett for .NET 10 while upstream still targets .NET 9. These warnings
+      come from upstream code that is correct but uses APIs .NET 10 marks obsolete. Fixing them
+      would rewrite upstream lines that change often (Startup.cs, Program.cs, package versions in
+      Jackett.Server.csproj) and make every upstream sync conflict. Remove this file once upstream
+      moves to .NET 10 and makes the changes itself.
+
+      ASPDEPR005: ForwardedHeadersOptions.KnownNetworks / HttpOverrides.IPNetwork (Startup.cs)
+      ASPDEPR008: WebHost / IWebHostBuilder.Build (Program.cs)
+      NU1510:     Microsoft.Extensions.Configuration is part of the .NET 10 shared framework
+    -->
+    <PropertyGroup>
+        <NoWarn>$(NoWarn);ASPDEPR005;ASPDEPR008;NU1510</NoWarn>
+    </PropertyGroup>
+</Project>
