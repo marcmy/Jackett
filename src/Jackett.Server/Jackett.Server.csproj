@@ -60,7 +60,7 @@
     <PackageReference Include="NLog" Version="6.2.2" />
     <PackageReference Include="NLog.Web.AspNetCore" Version="6.2.2" />
     <PackageReference Include="System.Security.Cryptography.Xml" Version="10.0.14" />
-    <PackageReference Include="System.ServiceProcess.ServiceController" Version="10.0.14" />
+    <PackageReference Include="System.ServiceProcess.ServiceController" Version="11.0.0" />
     <PackageReference Include="System.Text.Encoding.CodePages" Version="10.0.14" />
   </ItemGroup>
 
