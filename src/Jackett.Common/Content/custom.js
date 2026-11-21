@@ -912,11 +912,11 @@ function resolveUrl(baseUrl, url) {
 
 function doErrorNotify(indexerId, errorMessage, errorEvent) {
   if (errorMessage !== undefined) {
-    var githubRepo = "Jackett/Jackett";
+    var githubRepo = "marcmy/Jackett";
     var githubText = "this indexer";
     var githubTemplate = "?template=bug_report.yml&"
     if (errorMessage.includes("FlareSolverr")) {
-      githubRepo = "FlareSolverr/FlareSolverr";
+      githubRepo = "marcmy/FlareSolverr";
       githubText = "FlareSolverr"
     }
     var githubUrl = "https://github.com/" + githubRepo + "/issues/new" + githubTemplate + "title=[" + indexerId + "] (" + errorEvent + ")";

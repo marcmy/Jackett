@@ -1358,7 +1358,7 @@ dotnet publish Jackett.Server -f net10.0 --self-contained -r osx-x64 -c Debug
 
 ```bash
 # Install build tools (Debian/Ubuntu)
-sudo apt install nuget msbuild dotnet-sdk-9.0
+sudo apt install nuget msbuild dotnet-sdk-10.0
 
 # For other distributions, install equivalent packages
 ```

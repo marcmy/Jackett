@@ -950,19 +950,18 @@
       var classes = this.options.optionClass(group);
       $li.addClass(classes);
 
-      if (this.options.enableHTML) {
-        $('label b', $li).html(" " + label);
-      }
-      else {
-        $('label b', $li).text(" " + label);
-      }
+      // Optgroup labels come from DOM attributes and must remain text.
+      $('label b', $li).text(" " + label);
 
       if (this.options.enableCollapsibleOptGroups && this.options.multiple) {
         $('a', $li).append('<span class="caret-container"><b class="caret"></b></span>');
       }
 
       if (this.options.enableClickableOptGroups && this.options.multiple) {
-        $('a label', $li).prepend('<input type="checkbox" value="' + value + '"/>');
+        var checkbox = document.createElement('input');
+        checkbox.type = 'checkbox';
+        checkbox.value = value;
+        $('a label', $li).prepend(checkbox);
       }
 
       if ($(group).is(':disabled')) {
