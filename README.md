@@ -68,11 +68,11 @@ A third-party Golang SDK for Jackett is available from [webtor-io/go-jackett](ht
 
 ## Supported Systems
 
-The currently supported version of Jackett is **0.24.+**, which is compatible with:
+The currently supported version of Jackett is **0.25.+**, which is compatible with:
 
 - **Windows:** Windows 10 Version 1607 or greater ([full list](https://github.com/dotnet/core/blob/main/release-notes/10.0/supported-os.md#windows))
 - **Linux:** Various distributions ([full list](https://github.com/dotnet/core/blob/main/release-notes/10.0/supported-os.md#linux))
-- **macOS:** macOS 13.0+ (Ventura) or greater ([full list](https://github.com/dotnet/core/blob/main/release-notes/10.0/supported-os.md#apple))
+- **macOS:** macOS 15.0+ (Sequoia) or greater ([full list](https://github.com/dotnet/core/blob/main/release-notes/10.0/supported-os.md#apple))
 
 Prior versions of Jackett are no longer supported.
 
@@ -648,12 +648,12 @@ Prior versions of Jackett are no longer supported.
  * TorrentDay (TD)
  * TorrentDD (TodayBit)
  * Torrenteros (TTR)
- * TorrentHaven
  * TorrentHR
  * Torrenting (TT)
  * TorrentLeech (TL)
  * ToTheGlory (TTG) [![(invite needed)][inviteneeded]](#)
  * TrackerMK
+ * Trackerformers
  * TrackerZero [PAY2DL]
  * TranceTraffic
  * Trellas (Magico) [![(invite needed)][inviteneeded]](#)
@@ -754,7 +754,7 @@ This section covers installation on most common Linux distributions including Ub
 
 **Prerequisites:**
 - Most operating systems include all required dependencies
-- If dependencies are missing, refer to [.NET Required Packages](https://github.com/dotnet/core/blob/main/release-notes/10.0/os-packages.md)
+- If dependencies are missing, refer to [.NET Required Packages](https://github.com/dotnet/core/blob/main/release-notes/10.0/dotnet-dependencies.md)
 
 #### Method 1: One-Command Installation (Easiest)
 
@@ -839,7 +839,7 @@ For modern ARM-based systems (Raspberry Pi, etc.)
 
 **Prerequisites:**
 - Most operating systems include all required dependencies
-- If dependencies are missing, refer to [.NET Required Packages](https://github.com/dotnet/core/blob/main/release-notes/10.0/os-packages.md)
+- If dependencies are missing, refer to [.NET Required Packages](https://github.com/dotnet/core/blob/main/release-notes/10.0/dotnet-dependencies.md)
 
 #### Installing as a Service
 
@@ -923,7 +923,7 @@ For legacy ARM systems.
 ### macOS Installation
 
 **Prerequisites:**
-- macOS 13.0+ (Ventura) or greater
+- macOS 15.0+ (Sequoia) or greater
 
 #### Installing as a Service
 

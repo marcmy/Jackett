@@ -1,12 +1,9 @@
-using System;
 using System.IO;
-using System.Text;
 using Jackett.Common.Models.Config;
 using Jackett.Common.Services;
 using Jackett.Common.Utils.Logging;
 using NLog;
 using NLog.Config;
-using NLog.LayoutRenderers;
 using NLog.Targets;
 
 namespace Jackett.Common.Utils
@@ -33,6 +30,15 @@ namespace Jackett.Common.Utils
             };
             logConfig.AddTarget("file", logFile);
 
+            var microsoftLifetimeRule = new LoggingRule
+            {
+                LoggerNamePattern = "Microsoft.Hosting.Lifetime",
+                Final = true
+            };
+            microsoftLifetimeRule.SetLoggingLevels(LogLevel.Info, LogLevel.Fatal);
+            microsoftLifetimeRule.Targets.Add(logFile);
+            logConfig.LoggingRules.Add(microsoftLifetimeRule);
+
             var microsoftRule = new LoggingRule
             {
                 LoggerNamePattern = "Microsoft.*",
@@ -43,10 +49,10 @@ namespace Jackett.Common.Utils
 
             var microsoftDebugRule = new LoggingRule
             {
-                LoggerNamePattern = "Microsoft.*"
+                LoggerNamePattern = "Microsoft.*",
+                Final = true
             };
             microsoftDebugRule.SetLoggingLevels(LogLevel.Debug, LogLevel.Info);
-            microsoftDebugRule.Final = true;
             if (settings.TracingEnabled)
             {
                 microsoftDebugRule.Targets.Add(logFile);
@@ -75,6 +81,9 @@ namespace Jackett.Common.Utils
 
                 var serviceRule = new LoggingRule("*", logLevel, logService);
                 logConfig.LoggingRules.Add(serviceRule);
+
+                microsoftLifetimeRule.Targets.Add(logConsole);
+                microsoftLifetimeRule.Targets.Add(logService);
 
                 microsoftRule.Targets.Add(logConsole);
                 microsoftRule.Targets.Add(logService);
