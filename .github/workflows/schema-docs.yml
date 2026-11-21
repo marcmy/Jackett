@@ -2,7 +2,6 @@ name: Schema Documentation
 
 on:
   push:
-    branches: [ master ]
     paths:
       - src/Jackett.Common/Definitions/schema.json
   workflow_dispatch:
@@ -20,11 +19,11 @@ jobs:
         uses: actions/setup-node@v7
 
       - name: Install dependencies
-        run: npm install -g @adobe/jsonschema2md@8.0.11
+        run: npm install -g @adobe/jsonschema2md
 
       - name: Run script
         run: |
-          jsonschema2md -d "src/Jackett.Common/Definitions" -o "docs" -f yaml -x -
+          jsonschema2md -d "src/Jackett.Common/Definitions" -o "docs" -f yaml
 
       - name: Create Pull Request
         uses: peter-evans/create-pull-request@v8
