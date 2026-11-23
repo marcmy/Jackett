@@ -181,7 +181,6 @@ jobs:
           retention-days: 30
           compression-level: 9
 
-
   build-linux:
     name: Linux x64 .NET 11 validation
     runs-on: ubuntu-24.04
@@ -199,6 +198,11 @@ jobs:
         with:
           dotnet-version: 11.0.x
 
+      - name: Build retained .NET Standard 2.0 library targets
+        run: |
+          dotnet build src/DateTimeRoutines/DateTimeRoutines.csproj -c Release -f netstandard2.0
+          dotnet build src/Jackett.Common/Jackett.Common.csproj -c Release -f netstandard2.0
+
       - name: Run focused indexer regression tests
         run: |
           dotnet test src/Jackett.Test/Jackett.Test.csproj --framework net11.0 --configuration Release --filter 'FullyQualifiedName~CardigannIndexer'
@@ -210,6 +214,37 @@ jobs:
           dotnet publish src/Jackett.Updater/Jackett.Updater.csproj -c Release -f net11.0 -r linux-x64 --self-contained true -o "$RUNNER_TEMP/jackett-updater"
           test -f "$RUNNER_TEMP/jackett-server/jackett"
           test -f "$RUNNER_TEMP/jackett-updater/JackettUpdater"
+
+  build-legacy:
+    name: .NET Framework 4.7.1 compatibility
+    runs-on: windows-2025
+    timeout-minutes: 30
+
+    steps:
+      - name: Check out source
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          ref: ${{ inputs.source_ref || github.sha }}
+          persist-credentials: false
+
+      - name: Set up .NET 11 SDK
+        uses: actions/setup-dotnet@0f4a354dd5547a28c70b7853dbd95d5b67886e73 # v6
+        with:
+          dotnet-version: 11.0.x
+
+      - name: Compile legacy .NET Framework targets
+        shell: pwsh
+        run: |
+          $ErrorActionPreference = 'Stop'
+          foreach ($project in @(
+            'src/Jackett.Server/Jackett.Server.csproj'
+            'src/Jackett.Updater/Jackett.Updater.csproj'
+            'src/Jackett.Test/Jackett.Test.csproj'
+            'src/Jackett.IntegrationTests/Jackett.IntegrationTests.csproj'
+          )) {
+            dotnet build $project --configuration Release --framework net471
+            if ($LASTEXITCODE -ne 0) { throw "Legacy build failed: $project" }
+          }
 
   publish-release:
     name: Start rolling release publication
