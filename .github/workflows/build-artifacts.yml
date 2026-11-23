@@ -215,6 +215,36 @@ jobs:
           test -f "$RUNNER_TEMP/jackett-server/jackett"
           test -f "$RUNNER_TEMP/jackett-updater/JackettUpdater"
 
+      - name: Smoke-test Jackett HTTP startup on .NET 11
+        shell: bash
+        run: |
+          set -euo pipefail
+          export XDG_CONFIG_HOME="$RUNNER_TEMP/jackett-smoke-config"
+          mkdir -p "$XDG_CONFIG_HOME"
+          "$RUNNER_TEMP/jackett-server/jackett" --NoUpdates --ListenPrivate --Port 19117 > "$RUNNER_TEMP/jackett-smoke.log" 2>&1 &
+          server_pid=$!
+          trap 'kill "$server_pid" 2>/dev/null || true' EXIT
+
+          ready=false
+          for attempt in {1..90}; do
+            if curl --noproxy '*' --fail --location --silent --show-error --max-time 2 http://127.0.0.1:19117/ -o "$RUNNER_TEMP/jackett-home.html" 2>/dev/null; then
+              ready=true
+              break
+            fi
+            if ! kill -0 "$server_pid" 2>/dev/null; then
+              break
+            fi
+            sleep 1
+          done
+
+          if [ "$ready" != true ] || ! grep -qi 'jackett' "$RUNNER_TEMP/jackett-home.html"; then
+            echo "::error::Jackett failed the local HTTP startup check"
+            tail -n 120 "$RUNNER_TEMP/jackett-smoke.log" || true
+            exit 1
+          fi
+          echo "Jackett .NET 11 startup and localhost HTTP response verified."
+
+
   build-legacy:
     name: .NET Framework 4.7.1 compatibility
     runs-on: windows-2025
