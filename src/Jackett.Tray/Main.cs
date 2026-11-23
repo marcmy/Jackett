@@ -32,6 +32,7 @@ namespace Jackett.Tray
         {
             Hide();
             InitializeComponent();
+            notifyIcon1.Text = $"Jackett {EnvironmentUtil.JackettVersion()}";
 
             Opacity = 0;
             Enabled = false;
