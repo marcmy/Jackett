@@ -227,7 +227,7 @@ jobs:
 
           ready=false
           for attempt in {1..90}; do
-            if curl --noproxy '*' --fail --location --silent --show-error --max-time 2 http://127.0.0.1:19117/ -o "$RUNNER_TEMP/jackett-home.html" 2>/dev/null; then
+            if curl --noproxy '*' --fail --silent --show-error --max-time 2 http://127.0.0.1:19117/health -o "$RUNNER_TEMP/jackett-health.json" 2>/dev/null; then
               ready=true
               break
             fi
@@ -237,12 +237,12 @@ jobs:
             sleep 1
           done
 
-          if [ "$ready" != true ] || ! grep -qi 'jackett' "$RUNNER_TEMP/jackett-home.html"; then
-            echo "::error::Jackett failed the local HTTP startup check"
+          if [ "$ready" != true ] || ! grep -Eq '"status"[[:space:]]*:[[:space:]]*"OK"' "$RUNNER_TEMP/jackett-health.json"; then
+            echo "::error::Jackett failed the GET /health startup check"
             tail -n 120 "$RUNNER_TEMP/jackett-smoke.log" || true
             exit 1
           fi
-          echo "Jackett .NET 11 startup and localhost HTTP response verified."
+          echo "Jackett .NET 11 startup and /health JSON response verified."
 
 
   build-legacy:
